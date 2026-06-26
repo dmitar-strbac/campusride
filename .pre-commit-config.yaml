@@ -13,8 +13,8 @@ repos:
         language: system
         pass_filenames: false
 
-      - id: backend-tests
-        name: backend tests
-        entry: bash -c "cd backend && ./mvnw test"
+      - id: backend-format
+        name: backend spotless
+        entry: bash -c "cd backend && ./mvnw spotless:check"
         language: system
         pass_filenames: false
