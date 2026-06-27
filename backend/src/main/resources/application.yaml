@@ -27,5 +27,5 @@ server:
   port: 8080
 
 jwt:
-  secret: temporary-dev-secret-change-later
+  secret: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   expiration: 86400000

@@ -202,7 +202,7 @@ The project follows automated code quality checks before every commit.
 ## 📌 Roadmap
 
 - [x] Project setup
-- [ ] Authentication
+- [x] Authentication
 - [ ] Ride management
 - [ ] Booking workflow
 - [ ] Chat
