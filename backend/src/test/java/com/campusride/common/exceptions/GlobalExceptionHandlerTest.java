@@ -1,5 +1,6 @@
 package com.campusride.common.exceptions;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,7 +11,10 @@ import com.campusride.auth.dto.RegisterRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -72,5 +76,66 @@ class GlobalExceptionHandlerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.error").value("Bad Request"));
+  }
+
+  @Test
+  void handleRideNotFound_shouldReturnNotFound() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/rides/99");
+
+    ResponseEntity<ErrorResponse> response =
+        handler.handleRideNotFound(new RideNotFoundException(), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(404);
+    assertThat(response.getBody().message()).isEqualTo("Ride not found");
+    assertThat(response.getBody().path()).isEqualTo("/api/rides/99");
+  }
+
+  @Test
+  void handleRideAccessDenied_shouldReturnForbidden() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/rides/1/cancel");
+
+    ResponseEntity<ErrorResponse> response =
+        handler.handleRideAccessDenied(new RideAccessDeniedException(), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(403);
+    assertThat(response.getBody().message()).isEqualTo("You are not allowed to modify this ride");
+  }
+
+  @Test
+  void handleRideAlreadyCancelled_shouldReturnConflict() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/rides/1/cancel");
+
+    ResponseEntity<ErrorResponse> response =
+        handler.handleRideAlreadyCancelled(new RideAlreadyCancelledException(), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(409);
+    assertThat(response.getBody().message()).isEqualTo("Ride is already cancelled");
+  }
+
+  @Test
+  void handleGeneralException_shouldReturnInternalServerError() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/test");
+
+    ResponseEntity<ErrorResponse> response =
+        handler.handleGeneralException(new RuntimeException("Boom"), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(500);
+    assertThat(response.getBody().message()).isEqualTo("Unexpected server error");
   }
 }

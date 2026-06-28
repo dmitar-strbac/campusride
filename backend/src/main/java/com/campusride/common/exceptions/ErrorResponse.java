@@ -1,4 +1,3 @@
-// common/exception/ErrorResponse.java
 package com.campusride.common.exceptions;
 
 import java.time.LocalDateTime;
