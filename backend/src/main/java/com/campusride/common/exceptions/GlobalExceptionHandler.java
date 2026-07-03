@@ -29,6 +29,25 @@ public class GlobalExceptionHandler {
     return buildErrorResponse(HttpStatus.BAD_REQUEST, message, request.getRequestURI());
   }
 
+  @ExceptionHandler(RideNotFoundException.class)
+  public ResponseEntity<ErrorResponse> handleRideNotFound(
+      RideNotFoundException ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request.getRequestURI());
+  }
+
+  @ExceptionHandler(RideAccessDeniedException.class)
+  public ResponseEntity<ErrorResponse> handleRideAccessDenied(
+      RideAccessDeniedException ex, HttpServletRequest request) {
+
+    return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI());
+  }
+
+  @ExceptionHandler(RideAlreadyCancelledException.class)
+  public ResponseEntity<ErrorResponse> handleRideAlreadyCancelled(
+      RideAlreadyCancelledException ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI());
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleGeneralException(
       Exception ex, HttpServletRequest request) {

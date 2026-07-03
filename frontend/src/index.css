@@ -29,3 +29,7 @@ body {
 .animate-fade-up {
   animation: fadeUp 0.45s ease-out both;
 }
+
+input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
