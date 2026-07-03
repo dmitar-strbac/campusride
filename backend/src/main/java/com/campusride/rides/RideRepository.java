@@ -15,8 +15,8 @@ public interface RideRepository extends JpaRepository<Ride, Long> {
             select r from Ride r
             where r.status = :status
               and r.departureTime > :now
-              and (:origin is null or lower(r.origin) like lower(concat('%', :origin, '%')))
-              and (:destination is null or lower(r.destination) like lower(concat('%', :destination, '%')))
+              and (:origin is null or lower(r.origin) like concat('%', lower(cast(:origin as string)), '%'))
+              and (:destination is null or lower(r.destination) like concat('%', lower(cast(:destination as string)), '%'))
             order by r.departureTime asc
             """)
   List<Ride> searchActiveRides(

@@ -203,7 +203,7 @@ The project follows automated code quality checks before every commit.
 
 - [x] Project setup
 - [x] Authentication
-- [ ] Ride management
+- [x] Ride management
 - [ ] Booking workflow
 - [ ] Chat
 - [ ] Notifications

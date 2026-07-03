@@ -2,10 +2,14 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
+import { CreateRidePage } from './pages/CreateRidePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { MyRidesPage } from './pages/MyRidesPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { RideDetailsPage } from './pages/RideDetailsPage';
+import { RidesPage } from './pages/RidesPage';
 
 function App() {
   return (
@@ -21,6 +25,38 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rides"
+            element={
+              <ProtectedRoute>
+                <RidesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rides/create"
+            element={
+              <ProtectedRoute>
+                <CreateRidePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rides/my"
+            element={
+              <ProtectedRoute>
+                <MyRidesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rides/:id"
+            element={
+              <ProtectedRoute>
+                <RideDetailsPage />
               </ProtectedRoute>
             }
           />

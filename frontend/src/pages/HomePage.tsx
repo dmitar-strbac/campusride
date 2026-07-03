@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import { RoadAnimation } from '../components/RoadAnimation';
+import { useAuth } from '../context/useAuth';
 
 export function HomePage() {
+  const { user } = useAuth();
+
   return (
     <main className="min-h-screen bg-[#060e1a]">
       <section>
@@ -25,7 +28,7 @@ export function HomePage() {
 
             <div className="mt-9 flex flex-wrap gap-4">
               <Link
-                to="/register"
+                to={user ? '/rides' : '/login'}
                 className="flex items-center gap-2 rounded-xl bg-blue-500 px-7 py-3.5 font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-600"
               >
                 <svg
@@ -43,7 +46,7 @@ export function HomePage() {
                 Find a ride
               </Link>
               <Link
-                to="/register"
+                to={user ? '/rides/create' : '/login'}
                 className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-7 py-3.5 font-semibold text-white transition hover:bg-white/10"
               >
                 <svg
