@@ -138,4 +138,58 @@ class GlobalExceptionHandlerTest {
     assertThat(response.getBody().status()).isEqualTo(500);
     assertThat(response.getBody().message()).isEqualTo("Unexpected server error");
   }
+
+  @Test
+  void handleBookingNotFound_shouldReturnNotFound() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/bookings/99");
+
+    BookingNotFoundException exception = new BookingNotFoundException();
+
+    ResponseEntity<ErrorResponse> response = handler.handleBookingNotFound(exception, request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(404);
+    assertThat(response.getBody().error()).isEqualTo("Not Found");
+    assertThat(response.getBody().message()).isEqualTo(exception.getMessage());
+    assertThat(response.getBody().path()).isEqualTo("/api/bookings/99");
+  }
+
+  @Test
+  void handleBookingAccessDenied_shouldReturnForbidden() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/bookings/10");
+
+    BookingAccessDeniedException exception = new BookingAccessDeniedException();
+
+    ResponseEntity<ErrorResponse> response = handler.handleBookingAccessDenied(exception, request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(403);
+    assertThat(response.getBody().error()).isEqualTo("Forbidden");
+    assertThat(response.getBody().message()).isEqualTo(exception.getMessage());
+    assertThat(response.getBody().path()).isEqualTo("/api/bookings/10");
+  }
+
+  @Test
+  void handleBookingConflict_shouldReturnConflict() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/rides/1/bookings");
+
+    DuplicateBookingException exception = new DuplicateBookingException();
+
+    ResponseEntity<ErrorResponse> response = handler.handleBookingConflict(exception, request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().status()).isEqualTo(409);
+    assertThat(response.getBody().error()).isEqualTo("Conflict");
+    assertThat(response.getBody().message()).isEqualTo(exception.getMessage());
+    assertThat(response.getBody().path()).isEqualTo("/api/rides/1/bookings");
+  }
 }

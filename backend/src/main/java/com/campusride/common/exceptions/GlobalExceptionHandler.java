@@ -38,13 +38,35 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(RideAccessDeniedException.class)
   public ResponseEntity<ErrorResponse> handleRideAccessDenied(
       RideAccessDeniedException ex, HttpServletRequest request) {
-
     return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI());
   }
 
   @ExceptionHandler(RideAlreadyCancelledException.class)
   public ResponseEntity<ErrorResponse> handleRideAlreadyCancelled(
       RideAlreadyCancelledException ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI());
+  }
+
+  @ExceptionHandler(BookingNotFoundException.class)
+  public ResponseEntity<ErrorResponse> handleBookingNotFound(
+      BookingNotFoundException ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request.getRequestURI());
+  }
+
+  @ExceptionHandler({BookingAccessDeniedException.class})
+  public ResponseEntity<ErrorResponse> handleBookingAccessDenied(
+      BookingAccessDeniedException ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI());
+  }
+
+  @ExceptionHandler({
+    DuplicateBookingException.class,
+    InsufficientSeatsException.class,
+    InvalidBookingStateException.class,
+    OwnRideBookingException.class
+  })
+  public ResponseEntity<ErrorResponse> handleBookingConflict(
+      RuntimeException ex, HttpServletRequest request) {
     return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI());
   }
 

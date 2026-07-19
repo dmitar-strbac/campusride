@@ -19,7 +19,7 @@ function StatusBadge({ status }: { status: string }) {
   };
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-xs font-semibold ${styles[status] ?? 'border-white/10 bg-white/5 text-slate-400'}`}
+      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${styles[status] ?? 'border-white/10 bg-white/5 text-slate-400'}`}
     >
       {status}
     </span>
@@ -31,7 +31,10 @@ export function MyRidesPage() {
 
   const [rides, setRides] = useState<Ride[]>([]);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [processingRideId, setProcessingRideId] = useState<number | null>(null);
+  const [rideToCancel, setRideToCancel] = useState<Ride | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -48,13 +51,24 @@ export function MyRidesPage() {
     void load();
   }, [token]);
 
-  async function handleCancel(rideId: number) {
-    if (!token) return;
+  async function handleCancel() {
+    if (!token || !rideToCancel) return;
+
+    const rideId = rideToCancel.id;
+
+    setProcessingRideId(rideId);
+    setError('');
+    setSuccessMessage('');
+
     try {
       const updated = await ridesApi.cancelRide(rideId, token);
       setRides((current) => current.map((r) => (r.id === rideId ? updated : r)));
+      setSuccessMessage('Your ride has been cancelled.');
+      setRideToCancel(null);
     } catch {
       setError('Could not cancel ride.');
+    } finally {
+      setProcessingRideId(null);
     }
   }
 
@@ -95,6 +109,12 @@ export function MyRidesPage() {
           </div>
         )}
 
+        {successMessage && (
+          <div className="mt-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            {successMessage}
+          </div>
+        )}
+
         <div className="mt-8 grid gap-4">
           {isLoading ? (
             <div className="flex items-center gap-3 py-8 text-slate-400">
@@ -116,21 +136,23 @@ export function MyRidesPage() {
               Loading your rides...
             </div>
           ) : rides.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-[#0d1b2e] p-10 text-center">
-              <svg
-                className="mx-auto h-10 w-10 text-slate-600"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M19 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.5L8 5h8l1.5 2H19a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2z" />
-                <circle cx="7.5" cy="17" r="2" />
-                <circle cx="16.5" cy="17" r="2" />
-              </svg>
-              <p className="mt-4 font-semibold text-white">No rides yet</p>
+            <div className="rounded-3xl border border-white/10 bg-[#0d1b2e] px-6 py-14 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/10">
+                <svg
+                  className="h-8 w-8 text-blue-400"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M19 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.5L8 5h8l1.5 2H19a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2z" />
+                  <circle cx="7.5" cy="17" r="2" />
+                  <circle cx="16.5" cy="17" r="2" />
+                </svg>
+              </div>
+              <p className="mt-5 font-semibold text-white">No rides yet</p>
               <p className="mt-1 text-sm text-slate-400">
                 Share your first trip and start earning.
               </p>
@@ -143,7 +165,10 @@ export function MyRidesPage() {
             </div>
           ) : (
             rides.map((ride) => (
-              <div key={ride.id} className="rounded-2xl border border-white/10 bg-[#0d1b2e] p-6">
+              <div
+                key={ride.id}
+                className="rounded-3xl border border-white/10 bg-[#0d1b2e] p-6 shadow-xl shadow-black/10 transition hover:border-white/15"
+              >
                 <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
                   <div className="flex items-center gap-4">
                     <div className="hidden shrink-0 flex-col items-center gap-1 sm:flex">
@@ -184,6 +209,13 @@ export function MyRidesPage() {
 
                   <div className="flex flex-wrap gap-3">
                     <Link
+                      to={`/rides/${ride.id}/bookings`}
+                      className="rounded-xl bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
+                    >
+                      Booking requests
+                    </Link>
+
+                    <Link
                       to={`/rides/${ride.id}`}
                       className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:-translate-y-0.5 hover:bg-white/10 hover:text-white"
                     >
@@ -191,10 +223,15 @@ export function MyRidesPage() {
                     </Link>
                     {ride.status === 'ACTIVE' && (
                       <button
-                        onClick={() => handleCancel(ride.id)}
-                        className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 hover:text-red-300"
+                        onClick={() => {
+                          setError('');
+                          setSuccessMessage('');
+                          setRideToCancel(ride);
+                        }}
+                        disabled={processingRideId === ride.id}
+                        className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Cancel ride
+                        {processingRideId === ride.id ? 'Cancelling...' : 'Cancel ride'}
                       </button>
                     )}
                   </div>
@@ -204,6 +241,54 @@ export function MyRidesPage() {
           )}
         </div>
       </section>
+
+      {rideToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1b2e] p-7 shadow-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
+              <svg
+                className="h-7 w-7 text-red-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+                <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+              </svg>
+            </div>
+
+            <h2 className="mt-5 text-center text-2xl font-bold text-white">Cancel ride?</h2>
+
+            <p className="mt-3 text-center text-sm leading-6 text-slate-400">
+              Your ride from {rideToCancel.origin} to {rideToCancel.destination} will become
+              unavailable for other students.
+            </p>
+
+            <div className="mt-7 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setRideToCancel(null)}
+                className="flex-1 rounded-xl border border-white/10 py-3 font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+              >
+                Keep ride
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleCancel()}
+                disabled={processingRideId !== null}
+                className="flex-1 rounded-xl bg-red-500 py-3 font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Confirm cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

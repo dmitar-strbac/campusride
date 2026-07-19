@@ -1,10 +1,14 @@
 package com.campusride.rides;
 
 import com.campusride.users.User;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface RideRepository extends JpaRepository<Ride, Long> {
 
@@ -21,4 +25,8 @@ public interface RideRepository extends JpaRepository<Ride, Long> {
             """)
   List<Ride> searchActiveRides(
       RideStatus status, LocalDateTime now, String origin, String destination);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select r from Ride r where r.id = :id")
+  Optional<Ride> findByIdForUpdate(@Param("id") Long id);
 }

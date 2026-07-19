@@ -47,7 +47,7 @@ export function HomePage() {
               </Link>
               <Link
                 to={user ? '/rides/create' : '/login'}
-                className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-7 py-3.5 font-semibold text-white transition hover:bg-white/10"
+                className="flex items-center gap-2 rounded-xl border border-blue-500/40 bg-white/5 px-7 py-3.5 font-semibold text-blue-400 transition hover:border-blue-400 hover:text-blue-300"
               >
                 <svg
                   className="h-4 w-4"
