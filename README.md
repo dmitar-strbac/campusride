@@ -204,7 +204,7 @@ The project follows automated code quality checks before every commit.
 - [x] Project setup
 - [x] Authentication
 - [x] Ride management
-- [ ] Booking workflow
+- [x] Booking workflow
 - [ ] Chat
 - [ ] Notifications
 - [ ] Ratings
