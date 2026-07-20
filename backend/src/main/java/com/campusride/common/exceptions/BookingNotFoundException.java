@@ -1,0 +1,8 @@
+package com.campusride.common.exceptions;
+
+public class BookingNotFoundException extends RuntimeException {
+
+  public BookingNotFoundException() {
+    super("Booking not found");
+  }
+}

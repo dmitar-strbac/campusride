@@ -59,11 +59,11 @@ export function Navbar() {
                   <circle cx="7.5" cy="17" r="2" />
                   <circle cx="16.5" cy="17" r="2" />
                 </svg>
-                My rides
+                <span className="hidden md:inline">My rides</span>
               </Link>
 
               <Link
-                to="/messages"
+                to="/bookings/my"
                 className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
                 <svg
@@ -75,11 +75,10 @@ export function Navbar() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  <line x1="9" y1="10" x2="15" y2="10" />
-                  <line x1="9" y1="13" x2="13" y2="13" />
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                 </svg>
-                Messages
+                <span className="hidden md:inline">My bookings</span>
               </Link>
 
               <Link
@@ -99,7 +98,7 @@ export function Navbar() {
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                   <line x1="12" y1="2" x2="12" y2="4" />
                 </svg>
-                Notifications
+                <span className="hidden md:inline">Notifications</span>
               </Link>
 
               <div className="relative ml-1" ref={dropdownRef}>
