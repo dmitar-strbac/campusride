@@ -20,10 +20,10 @@ function BookingStatusBadge({ status }: { status: BookingStatus }) {
   };
 
   const labels: Record<BookingStatus, string> = {
-    PENDING: 'Pending approval',
-    ACCEPTED: 'Accepted',
-    REJECTED: 'Rejected',
-    CANCELLED: 'Cancelled',
+    PENDING: 'PENDING APPROVAL',
+    ACCEPTED: 'ACCEPTED',
+    REJECTED: 'REJECTED',
+    CANCELLED: 'CANCELLED',
   };
 
   return (

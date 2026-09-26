@@ -70,6 +70,18 @@ public class GlobalExceptionHandler {
     return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI());
   }
 
+  @ExceptionHandler(ChatAccessDeniedException.class)
+  public ResponseEntity<ErrorResponse> handleChatAccessDenied(
+      ChatAccessDeniedException ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI());
+  }
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ErrorResponse> handleBadArgument(
+      IllegalArgumentException ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI());
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleGeneralException(
       Exception ex, HttpServletRequest request) {
