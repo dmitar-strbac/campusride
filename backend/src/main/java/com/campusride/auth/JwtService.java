@@ -32,11 +32,7 @@ public class JwtService {
   }
 
   public boolean isTokenValid(String token, String email) {
-    return email.equals(extractUsername(token)) && !isTokenExpired(token);
-  }
-
-  private boolean isTokenExpired(String token) {
-    return extractAllClaims(token).getExpiration().before(new Date());
+    return email.equals(extractUsername(token));
   }
 
   private Claims extractAllClaims(String token) {

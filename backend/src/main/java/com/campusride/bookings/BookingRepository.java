@@ -6,6 +6,7 @@ import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -23,4 +24,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select b from Booking b where b.id = :id")
   Optional<Booking> findByIdForUpdate(@Param("id") Long id);
+
+  boolean existsByRideIdAndPassengerIdAndStatus(
+      Long rideId, Long passengerId, BookingStatus status);
+
+  @Query(
+      """
+            select distinct b.passenger.email
+            from Booking b
+            where b.ride.id = :rideId and b.status = :status
+            """)
+  Set<String> findPassengerEmailsByRideIdAndStatus(
+      @Param("rideId") Long rideId, @Param("status") BookingStatus status);
 }

@@ -1,7 +1,9 @@
+import { CarFront, ClipboardCheck, MessageCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/images/logo.png';
 import { useAuth } from '../context/useAuth';
+import { useChatUnread } from '../context/useChatUnread';
 
 function getInitials(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -12,6 +14,7 @@ export function Navbar() {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { total } = useChatUnread();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -44,61 +47,37 @@ export function Navbar() {
             <>
               <Link
                 to="/rides/my"
-                className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                aria-label="My rides"
+                title="My rides"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-300"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M19 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.5L8 5h8l1.5 2H19a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2z" />
-                  <circle cx="7.5" cy="17" r="2" />
-                  <circle cx="16.5" cy="17" r="2" />
-                </svg>
-                <span className="hidden md:inline">My rides</span>
+                <CarFront size={20} strokeWidth={1.8} aria-hidden="true" />
               </Link>
 
               <Link
                 to="/bookings/my"
-                className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                aria-label="My bookings"
+                title="My bookings"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-300"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M9 11l3 3L22 4" />
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                </svg>
-                <span className="hidden md:inline">My bookings</span>
+                <ClipboardCheck size={20} strokeWidth={1.8} aria-hidden="true" />
               </Link>
 
               <Link
-                to="/notifications"
-                className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                to="/chats"
+                aria-label="Messages"
+                title="Messages"
+                className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-300"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                  <line x1="12" y1="2" x2="12" y2="4" />
-                </svg>
-                <span className="hidden md:inline">Notifications</span>
+                <MessageCircle size={20} strokeWidth={1.8} />
+                {total > 0 && (
+                  <span
+                    className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0d1b2e] bg-blue-500 px-1 text-[10px] font-bold leading-none text-white"
+                    aria-label={`${total} unread messages`}
+                  >
+                    {total > 99 ? '99+' : total}
+                  </span>
+                )}
               </Link>
 
               <div className="relative ml-1" ref={dropdownRef}>

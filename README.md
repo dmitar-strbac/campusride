@@ -149,10 +149,21 @@ docker compose up -d
 
 ### Backend
 
+Create `backend/local.properties` for local configuration. This file is ignored by Git:
+
+```properties
+JWT_SECRET=your_base64_encoded_secret
+DB_URL=jdbc:postgresql://localhost:5432/campusride
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+```
+
 ```bash
 cd backend
-./mvnw spring-boot:run
+./mvnw spring-boot:run   # .\mvnw.cmd spring-boot:run on Windows
 ```
+
+Flyway applies database migrations on startup.
 
 ### Frontend
 
@@ -197,6 +208,13 @@ The project follows automated code quality checks before every commit.
 - Docker Compose for local development
 - GitHub Actions CI for build and test automation
 
+Run the backend tests and verification checks:
+
+```bash
+cd backend
+./mvnw verify   # .\mvnw.cmd verify on Windows
+```
+
 ---
 
 ## 📌 Roadmap
@@ -205,7 +223,7 @@ The project follows automated code quality checks before every commit.
 - [x] Authentication
 - [x] Ride management
 - [x] Booking workflow
-- [ ] Chat
+- [x] Chat
 - [ ] Notifications
 - [ ] Ratings
 - [ ] Maps
