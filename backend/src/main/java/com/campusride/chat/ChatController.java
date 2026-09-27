@@ -2,7 +2,11 @@ package com.campusride.chat;
 
 import com.campusride.chat.dto.ChatMessageResponse;
 import com.campusride.chat.dto.SendChatMessageRequest;
+import com.campusride.chat.dto.TypingEvent;
+import com.campusride.chat.dto.TypingRequest;
+import com.campusride.common.exceptions.ChatAccessDeniedException;
 import com.campusride.users.User;
+import com.campusride.users.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -23,11 +27,13 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 @RequestMapping("/api/rides")
 @RequiredArgsConstructor
-@Tag(name = "Ride Chat", description = "Message history for ride participants")
+@Tag(name = "Ride Chat", description = "Ride conversations, message history, and unread counts")
 public class ChatController {
 
   private final ChatService chatService;
   private final SimpMessagingTemplate messagingTemplate;
+  private final UserRepository userRepository;
+  private final ChatReadService chatReadService;
 
   @Operation(summary = "Get ride chat history")
   @GetMapping("/{rideId}/messages")
@@ -55,6 +61,33 @@ public class ChatController {
 
     for (String email : chatService.recipientEmails(rideId)) {
       messagingTemplate.convertAndSendToUser(email, "/queue/rides/" + rideId + "/chat", saved);
+      User recipient =
+          userRepository.findByEmail(email).orElseThrow(ChatAccessDeniedException::new);
+
+      messagingTemplate.convertAndSendToUser(
+          email, "/queue/chats/unread", chatReadService.getUnreadCount(rideId, recipient.getId()));
+    }
+  }
+
+  @MessageMapping("/rides/{rideId}/typing")
+  public void typing(@DestinationVariable Long rideId, TypingRequest request, Principal principal) {
+
+    User sender =
+        userRepository.findByEmail(principal.getName()).orElseThrow(ChatAccessDeniedException::new);
+
+    chatService.requireAccess(rideId, sender.getId());
+
+    TypingEvent event =
+        new TypingEvent(
+            rideId,
+            sender.getId(),
+            sender.getFirstName() + " " + sender.getLastName(),
+            request.typing());
+
+    for (String email : chatService.recipientEmails(rideId)) {
+      if (!email.equals(sender.getEmail())) {
+        messagingTemplate.convertAndSendToUser(email, "/queue/rides/" + rideId + "/typing", event);
+      }
     }
   }
 }

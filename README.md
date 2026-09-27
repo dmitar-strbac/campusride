@@ -208,6 +208,13 @@ The project follows automated code quality checks before every commit.
 - Docker Compose for local development
 - GitHub Actions CI for build and test automation
 
+Run the backend tests and verification checks:
+
+```bash
+cd backend
+./mvnw verify   # .\mvnw.cmd verify on Windows
+```
+
 ---
 
 ## 📌 Roadmap
@@ -216,7 +223,7 @@ The project follows automated code quality checks before every commit.
 - [x] Authentication
 - [x] Ride management
 - [x] Booking workflow
-- [ ] Chat
+- [x] Chat
 - [ ] Notifications
 - [ ] Ratings
 - [ ] Maps

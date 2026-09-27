@@ -1,3 +1,4 @@
+import { CarFront, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { RoadAnimation } from '../components/RoadAnimation';
 import { useAuth } from '../context/useAuth';
@@ -31,37 +32,14 @@ export function HomePage() {
                 to={user ? '/rides' : '/login'}
                 className="flex items-center gap-2 rounded-xl bg-blue-500 px-7 py-3.5 font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-600"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
                 Find a ride
               </Link>
               <Link
                 to={user ? '/rides/create' : '/login'}
                 className="flex items-center gap-2 rounded-xl border border-blue-500/40 bg-white/5 px-7 py-3.5 font-semibold text-blue-400 transition hover:border-blue-400 hover:text-blue-300"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M19 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.5L8 5h8l1.5 2H19a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2z" />
-                  <circle cx="7.5" cy="17" r="2" />
-                  <circle cx="16.5" cy="17" r="2" />
-                </svg>
+                <CarFront size={19} strokeWidth={1.9} aria-hidden="true" />
                 Offer a ride
               </Link>
             </div>

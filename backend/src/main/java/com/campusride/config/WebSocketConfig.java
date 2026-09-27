@@ -17,6 +17,7 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -28,9 +29,9 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-  private static final Pattern SEND = Pattern.compile("^/app/rides/([1-9][0-9]*)/chat$");
+  private static final Pattern SEND = Pattern.compile("^/app/rides/([1-9][0-9]*)/(?:chat|typing)$");
   private static final Pattern SUBSCRIBE =
-      Pattern.compile("^/user/queue/rides/([1-9][0-9]*)/chat$");
+      Pattern.compile("^/user/queue/rides/([1-9][0-9]*)/(?:chat|typing)$");
 
   private final JwtService jwtService;
   private final UserRepository userRepository;
@@ -60,7 +61,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         new ChannelInterceptor() {
           @Override
           public Message<?> preSend(Message<?> message, MessageChannel channel) {
-            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+            StompHeaderAccessor accessor =
+                MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+
+            if (accessor == null) {
+              throw new AccessDeniedException("Invalid STOMP message");
+            }
 
             StompCommand command = accessor.getCommand();
             if (command == null) {
@@ -100,6 +106,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
             if (accessor.getUser() == null) {
               throw new AccessDeniedException("Authentication required");
+            }
+
+            if (command == StompCommand.SUBSCRIBE
+                && "/user/queue/chats/unread".equals(accessor.getDestination())) {
+              return message;
             }
 
             if (command != StompCommand.SEND && command != StompCommand.SUBSCRIBE) {

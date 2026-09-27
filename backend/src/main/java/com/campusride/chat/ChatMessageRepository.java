@@ -18,4 +18,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             """)
   List<ChatMessage> findRecent(
       @Param("rideId") Long rideId, @Param("beforeId") Long beforeId, Pageable pageable);
+
+  boolean existsByIdAndRideId(Long id, Long rideId);
 }

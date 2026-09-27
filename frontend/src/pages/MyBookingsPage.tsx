@@ -1,3 +1,4 @@
+import { MessageCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { bookingsApi, getApiErrorMessage } from '../api/bookingsApi';
@@ -254,6 +255,16 @@ export function MyBookingsPage() {
                       >
                         View ride
                       </Link>
+
+                      {booking.status === 'ACCEPTED' && (
+                        <Link
+                          to={`/rides/${booking.rideId}/chat`}
+                          className="inline-flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-300 transition hover:border-blue-400/50 hover:bg-blue-500/20"
+                        >
+                          <MessageCircle size={17} strokeWidth={1.8} />
+                          Chat
+                        </Link>
+                      )}
 
                       {canCancel && (
                         <button
