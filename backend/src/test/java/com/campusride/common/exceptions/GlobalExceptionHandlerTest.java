@@ -192,4 +192,32 @@ class GlobalExceptionHandlerTest {
     assertThat(response.getBody().message()).isEqualTo(exception.getMessage());
     assertThat(response.getBody().path()).isEqualTo("/api/rides/1/bookings");
   }
+
+  @Test
+  void handleChatAccessDenied_shouldReturnForbidden() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/rides/10/messages");
+
+    ResponseEntity<ErrorResponse> response =
+        new GlobalExceptionHandler()
+            .handleChatAccessDenied(new ChatAccessDeniedException(), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().message()).isEqualTo("You do not have access to this ride chat");
+  }
+
+  @Test
+  void handleBadArgument_shouldReturnBadRequest() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/rides/10/messages");
+
+    ResponseEntity<ErrorResponse> response =
+        new GlobalExceptionHandler()
+            .handleBadArgument(new IllegalArgumentException("Invalid limit"), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().message()).isEqualTo("Invalid limit");
+  }
 }

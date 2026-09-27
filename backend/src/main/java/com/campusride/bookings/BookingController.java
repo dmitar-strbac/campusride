@@ -3,6 +3,8 @@ package com.campusride.bookings;
 import com.campusride.bookings.dto.BookingResponse;
 import com.campusride.bookings.dto.CreateBookingRequest;
 import com.campusride.users.User;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -18,10 +20,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
+@Tag(name = "Bookings", description = "Request seats and manage booking decisions")
 public class BookingController {
 
   private final BookingService bookingService;
 
+  @Operation(summary = "Request seats on a ride")
   @PostMapping("/rides/{rideId}/bookings")
   public BookingResponse requestBooking(
       @PathVariable Long rideId,
@@ -30,29 +34,34 @@ public class BookingController {
     return bookingService.requestBooking(rideId, request, user);
   }
 
+  @Operation(summary = "Get my bookings")
   @GetMapping("/bookings/my")
   public List<BookingResponse> getMyBookings(@AuthenticationPrincipal User user) {
     return bookingService.getMyBookings(user);
   }
 
+  @Operation(summary = "Get requests for my ride")
   @GetMapping("/rides/{rideId}/bookings")
   public List<BookingResponse> getRideBookingRequests(
       @PathVariable Long rideId, @AuthenticationPrincipal User user) {
     return bookingService.getRideBookingRequests(rideId, user);
   }
 
+  @Operation(summary = "Accept a booking request")
   @PatchMapping("/bookings/{bookingId}/accept")
   public BookingResponse acceptBooking(
       @PathVariable Long bookingId, @AuthenticationPrincipal User user) {
     return bookingService.acceptBooking(bookingId, user);
   }
 
+  @Operation(summary = "Reject a booking request")
   @PatchMapping("/bookings/{bookingId}/reject")
   public BookingResponse rejectBooking(
       @PathVariable Long bookingId, @AuthenticationPrincipal User user) {
     return bookingService.rejectBooking(bookingId, user);
   }
 
+  @Operation(summary = "Cancel my booking")
   @PatchMapping("/bookings/{bookingId}/cancel")
   public BookingResponse cancelBooking(
       @PathVariable Long bookingId, @AuthenticationPrincipal User user) {
