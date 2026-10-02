@@ -33,7 +33,7 @@ public class RideController {
     return rideService.createRide(request, user);
   }
 
-  @Operation(summary = "Search availablerides")
+  @Operation(summary = "Search available rides")
   @GetMapping
   public List<RideResponse> searchRides(
       @RequestParam(required = false) String origin,

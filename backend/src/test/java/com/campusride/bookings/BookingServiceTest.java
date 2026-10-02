@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.campusride.bookings.dto.BookingResponse;
@@ -18,6 +19,8 @@ import com.campusride.common.exceptions.InvalidBookingStateException;
 import com.campusride.common.exceptions.OwnRideBookingException;
 import com.campusride.common.exceptions.RideAccessDeniedException;
 import com.campusride.common.exceptions.RideNotFoundException;
+import com.campusride.notifications.NotificationType;
+import com.campusride.notifications.event.NotificationEventPublisher;
 import com.campusride.rides.Ride;
 import com.campusride.rides.RideRepository;
 import com.campusride.rides.RideStatus;
@@ -38,6 +41,7 @@ class BookingServiceTest {
 
   @Mock private BookingRepository bookingRepository;
   @Mock private RideRepository rideRepository;
+  @Mock private NotificationEventPublisher notificationEvents;
 
   @InjectMocks private BookingService bookingService;
 
@@ -49,7 +53,7 @@ class BookingServiceTest {
     CreateBookingRequest request = new CreateBookingRequest(2);
     Booking saved = createBooking(10L, ride, passenger, BookingStatus.PENDING, 2);
 
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
     when(bookingRepository.existsByRideAndPassengerAndStatusIn(
             any(Ride.class), any(User.class), anyList()))
         .thenReturn(false);
@@ -60,16 +64,19 @@ class BookingServiceTest {
     assertThat(response.status()).isEqualTo(BookingStatus.PENDING);
     assertThat(response.requestedSeats()).isEqualTo(2);
     verify(bookingRepository).save(any(Booking.class));
+    verify(notificationEvents)
+        .publish(1L, NotificationType.BOOKING_REQUESTED, ride, 10L, passenger, 2);
   }
 
   @Test
   void requestBooking_shouldRejectOwnRide() {
     User driver = createUser(1L);
     Ride ride = createRide(driver, RideStatus.ACTIVE, 3);
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
 
     assertThatThrownBy(() -> bookingService.requestBooking(1L, new CreateBookingRequest(1), driver))
         .isInstanceOf(OwnRideBookingException.class);
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
@@ -77,11 +84,12 @@ class BookingServiceTest {
     User driver = createUser(1L);
     User passenger = createUser(2L);
     Ride ride = createRide(driver, RideStatus.CANCELLED, 3);
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
 
     assertThatThrownBy(
             () -> bookingService.requestBooking(1L, new CreateBookingRequest(1), passenger))
         .isInstanceOf(InvalidBookingStateException.class);
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
@@ -89,11 +97,12 @@ class BookingServiceTest {
     User driver = createUser(1L);
     User passenger = createUser(2L);
     Ride ride = createRide(driver, RideStatus.ACTIVE, 1);
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
 
     assertThatThrownBy(
             () -> bookingService.requestBooking(1L, new CreateBookingRequest(2), passenger))
         .isInstanceOf(InsufficientSeatsException.class);
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
@@ -101,7 +110,7 @@ class BookingServiceTest {
     User driver = createUser(1L);
     User passenger = createUser(2L);
     Ride ride = createRide(driver, RideStatus.ACTIVE, 3);
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
     when(bookingRepository.existsByRideAndPassengerAndStatusIn(
             any(Ride.class), any(User.class), anyList()))
         .thenReturn(true);
@@ -109,6 +118,7 @@ class BookingServiceTest {
     assertThatThrownBy(
             () -> bookingService.requestBooking(1L, new CreateBookingRequest(1), passenger))
         .isInstanceOf(DuplicateBookingException.class);
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
@@ -131,6 +141,7 @@ class BookingServiceTest {
 
     assertThatThrownBy(() -> bookingService.getRideBookingRequests(1L, other))
         .isInstanceOf(RideAccessDeniedException.class);
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
@@ -140,8 +151,7 @@ class BookingServiceTest {
     Ride ride = createRide(driver, RideStatus.ACTIVE, 3);
     Booking booking = createBooking(10L, ride, passenger, BookingStatus.PENDING, 2);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
-    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
+    stubLockedBooking(booking);
     when(bookingRepository.save(booking)).thenReturn(booking);
     when(rideRepository.save(ride)).thenReturn(ride);
 
@@ -149,6 +159,7 @@ class BookingServiceTest {
 
     assertThat(response.status()).isEqualTo(BookingStatus.ACCEPTED);
     assertThat(ride.getAvailableSeats()).isEqualTo(1);
+    verify(notificationEvents).publish(2L, NotificationType.BOOKING_ACCEPTED, ride, 10L, driver, 2);
   }
 
   @Test
@@ -158,8 +169,7 @@ class BookingServiceTest {
     Ride ride = createRide(driver, RideStatus.ACTIVE, 1);
     Booking booking = createBooking(10L, ride, passenger, BookingStatus.PENDING, 2);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
-    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
+    stubLockedBooking(booking);
 
     assertThatThrownBy(() -> bookingService.acceptBooking(10L, driver))
         .isInstanceOf(InsufficientSeatsException.class);
@@ -178,11 +188,13 @@ class BookingServiceTest {
             BookingStatus.PENDING,
             1);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
+    stubLockedBooking(booking);
     when(bookingRepository.save(booking)).thenReturn(booking);
 
     assertThat(bookingService.rejectBooking(10L, driver).status())
         .isEqualTo(BookingStatus.REJECTED);
+    verify(notificationEvents)
+        .publish(2L, NotificationType.BOOKING_REJECTED, booking.getRide(), 10L, driver, 1);
   }
 
   @Test
@@ -192,8 +204,7 @@ class BookingServiceTest {
     Ride ride = createRide(driver, RideStatus.ACTIVE, 1);
     Booking booking = createBooking(10L, ride, passenger, BookingStatus.ACCEPTED, 2);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
-    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
+    stubLockedBooking(booking);
     when(rideRepository.save(ride)).thenReturn(ride);
     when(bookingRepository.save(booking)).thenReturn(booking);
 
@@ -201,6 +212,8 @@ class BookingServiceTest {
 
     assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
     assertThat(ride.getAvailableSeats()).isEqualTo(3);
+    verify(notificationEvents)
+        .publish(1L, NotificationType.BOOKING_CANCELLED, ride, 10L, passenger, 2);
   }
 
   @Test
@@ -214,23 +227,27 @@ class BookingServiceTest {
             BookingStatus.PENDING,
             1);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
+    stubLockedBooking(booking);
 
     assertThatThrownBy(() -> bookingService.cancelBooking(10L, createUser(3L)))
         .isInstanceOf(BookingAccessDeniedException.class);
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
   void acceptBooking_shouldThrowWhenBookingDoesNotExist() {
-    when(bookingRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+    when(bookingRepository.findRideIdByBookingId(99L)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> bookingService.acceptBooking(99L, createUser(1L)))
         .isInstanceOf(BookingNotFoundException.class);
+
+    verify(bookingRepository, never()).findByIdForUpdate(any());
+    verifyNoInteractions(rideRepository, notificationEvents);
   }
 
   @Test
   void requestBooking_shouldThrowWhenRideDoesNotExist() {
-    when(rideRepository.findById(99L)).thenReturn(Optional.empty());
+    when(rideRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
     assertThatThrownBy(
             () -> bookingService.requestBooking(99L, new CreateBookingRequest(1), createUser(2L)))
@@ -273,7 +290,7 @@ class BookingServiceTest {
     Ride ride = createRide(driver, RideStatus.ACTIVE, 3);
     Booking booking = createBooking(10L, ride, passenger, BookingStatus.PENDING, 1);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
+    stubLockedBooking(booking);
     when(bookingRepository.save(booking)).thenReturn(booking);
 
     BookingResponse response = bookingService.cancelBooking(10L, passenger);
@@ -281,9 +298,10 @@ class BookingServiceTest {
     assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
     assertThat(ride.getAvailableSeats()).isEqualTo(3);
 
-    verify(rideRepository, never()).findByIdForUpdate(any());
     verify(rideRepository, never()).save(any());
     verify(bookingRepository).save(booking);
+    verify(notificationEvents)
+        .publish(1L, NotificationType.BOOKING_CANCELLED, ride, 10L, passenger, 1);
   }
 
   @Test
@@ -295,7 +313,7 @@ class BookingServiceTest {
 
     Booking booking = createBooking(10L, ride, passenger, BookingStatus.PENDING, 1);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
+    stubLockedBooking(booking);
 
     assertThatThrownBy(() -> bookingService.cancelBooking(10L, passenger))
         .isInstanceOf(InvalidBookingStateException.class)
@@ -303,6 +321,7 @@ class BookingServiceTest {
 
     verify(bookingRepository, never()).save(any());
     verify(rideRepository, never()).save(any());
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
@@ -313,7 +332,7 @@ class BookingServiceTest {
 
     Booking booking = createBooking(10L, ride, passenger, BookingStatus.REJECTED, 1);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
+    stubLockedBooking(booking);
 
     assertThatThrownBy(() -> bookingService.cancelBooking(10L, passenger))
         .isInstanceOf(InvalidBookingStateException.class)
@@ -321,6 +340,7 @@ class BookingServiceTest {
 
     verify(bookingRepository, never()).save(any());
     verify(rideRepository, never()).save(any());
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
@@ -330,7 +350,7 @@ class BookingServiceTest {
     Ride ride = createRide(driver, RideStatus.ACTIVE, 3);
     ride.setDepartureTime(LocalDateTime.now().minusMinutes(1));
 
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
 
     assertThatThrownBy(
             () -> bookingService.requestBooking(1L, new CreateBookingRequest(1), passenger))
@@ -338,6 +358,7 @@ class BookingServiceTest {
         .hasMessage("Past rides cannot be booked");
 
     verify(bookingRepository, never()).save(any());
+    verifyNoInteractions(notificationEvents);
   }
 
   @Test
@@ -348,14 +369,35 @@ class BookingServiceTest {
 
     Booking booking = createBooking(10L, ride, passenger, BookingStatus.ACCEPTED, 1);
 
-    when(bookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
+    stubLockedBooking(booking);
 
     assertThatThrownBy(() -> bookingService.acceptBooking(10L, driver))
         .isInstanceOf(InvalidBookingStateException.class)
         .hasMessage("Only pending bookings can be accepted");
 
-    verify(rideRepository, never()).findByIdForUpdate(any());
     verify(bookingRepository, never()).save(any());
+    verifyNoInteractions(notificationEvents);
+  }
+
+  @Test
+  void cancelBooking_shouldRejectCancelledRide() {
+    User driver = createUser(1L);
+    User passenger = createUser(2L);
+    Ride ride = createRide(driver, RideStatus.CANCELLED, 1);
+    Booking booking = createBooking(10L, ride, passenger, BookingStatus.ACCEPTED, 2);
+
+    stubLockedBooking(booking);
+
+    assertThatThrownBy(() -> bookingService.cancelBooking(10L, passenger))
+        .isInstanceOf(InvalidBookingStateException.class)
+        .hasMessage("Bookings on cancelled rides cannot be cancelled");
+
+    assertThat(booking.getStatus()).isEqualTo(BookingStatus.ACCEPTED);
+    assertThat(ride.getAvailableSeats()).isEqualTo(1);
+
+    verify(bookingRepository, never()).save(any());
+    verify(rideRepository, never()).save(any());
+    verifyNoInteractions(notificationEvents);
   }
 
   private User createUser(Long id) {
@@ -393,5 +435,13 @@ class BookingServiceTest {
         .createdAt(LocalDateTime.now())
         .updatedAt(LocalDateTime.now())
         .build();
+  }
+
+  private void stubLockedBooking(Booking booking) {
+    when(bookingRepository.findRideIdByBookingId(booking.getId()))
+        .thenReturn(Optional.of(booking.getRide().getId()));
+    when(rideRepository.findByIdForUpdate(booking.getRide().getId()))
+        .thenReturn(Optional.of(booking.getRide()));
+    when(bookingRepository.findByIdForUpdate(booking.getId())).thenReturn(Optional.of(booking));
   }
 }

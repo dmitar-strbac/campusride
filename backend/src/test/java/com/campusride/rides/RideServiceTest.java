@@ -7,11 +7,16 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.campusride.bookings.BookingRepository;
+import com.campusride.bookings.BookingStatus;
 import com.campusride.common.exceptions.RideAccessDeniedException;
 import com.campusride.common.exceptions.RideAlreadyCancelledException;
 import com.campusride.common.exceptions.RideNotFoundException;
+import com.campusride.notifications.NotificationType;
+import com.campusride.notifications.event.NotificationEventPublisher;
 import com.campusride.rides.dto.CreateRideRequest;
 import com.campusride.rides.dto.RideResponse;
 import com.campusride.users.Role;
@@ -20,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,6 +38,8 @@ class RideServiceTest {
   @Mock private RideRepository rideRepository;
 
   @InjectMocks private RideService rideService;
+  @Mock private BookingRepository bookingRepository;
+  @Mock private NotificationEventPublisher notificationEvents;
 
   @Test
   void createRide_shouldCreateRideAndReturnResponse() {
@@ -160,25 +168,32 @@ class RideServiceTest {
     User driver = createUser(1L);
     Ride ride = createRide(1L, driver, RideStatus.ACTIVE);
 
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
     when(rideRepository.save(ride)).thenReturn(ride);
+    when(bookingRepository.findPassengerIdsByRideIdAndStatus(1L, BookingStatus.ACCEPTED))
+        .thenReturn(Set.of(2L, 3L));
 
     RideResponse response = rideService.cancelRide(1L, driver);
 
     assertThat(response.status()).isEqualTo(RideStatus.CANCELLED);
     verify(rideRepository).save(ride);
+    verify(notificationEvents)
+        .publish(2L, NotificationType.RIDE_CANCELLED, ride, null, driver, null);
+    verify(notificationEvents)
+        .publish(3L, NotificationType.RIDE_CANCELLED, ride, null, driver, null);
   }
 
   @Test
   void cancelRide_shouldThrowExceptionWhenRideDoesNotExist() {
     User driver = createUser(1L);
 
-    when(rideRepository.findById(99L)).thenReturn(Optional.empty());
+    when(rideRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> rideService.cancelRide(99L, driver))
         .isInstanceOf(RideNotFoundException.class);
 
     verify(rideRepository, never()).save(any());
+    verifyNoInteractions(bookingRepository, notificationEvents);
   }
 
   @Test
@@ -187,12 +202,13 @@ class RideServiceTest {
     User otherUser = createUser(2L);
     Ride ride = createRide(1L, driver, RideStatus.ACTIVE);
 
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
 
     assertThatThrownBy(() -> rideService.cancelRide(1L, otherUser))
         .isInstanceOf(RideAccessDeniedException.class);
 
     verify(rideRepository, never()).save(any());
+    verifyNoInteractions(bookingRepository, notificationEvents);
   }
 
   @Test
@@ -200,12 +216,13 @@ class RideServiceTest {
     User driver = createUser(1L);
     Ride ride = createRide(1L, driver, RideStatus.CANCELLED);
 
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
 
     assertThatThrownBy(() -> rideService.cancelRide(1L, driver))
         .isInstanceOf(RideAlreadyCancelledException.class);
 
     verify(rideRepository, never()).save(any());
+    verifyNoInteractions(bookingRepository, notificationEvents);
   }
 
   private User createUser(Long id) {

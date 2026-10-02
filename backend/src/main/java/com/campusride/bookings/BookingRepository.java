@@ -36,4 +36,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             """)
   Set<String> findPassengerEmailsByRideIdAndStatus(
       @Param("rideId") Long rideId, @Param("status") BookingStatus status);
+
+  @Query(
+      """
+        select distinct b.passenger.id
+        from Booking b
+        where b.ride.id = :rideId and b.status = :status
+        """)
+  Set<Long> findPassengerIdsByRideIdAndStatus(
+      @Param("rideId") Long rideId, @Param("status") BookingStatus status);
+
+  @Query("select b.ride.id from Booking b where b.id = :bookingId")
+  Optional<Long> findRideIdByBookingId(@Param("bookingId") Long bookingId);
 }

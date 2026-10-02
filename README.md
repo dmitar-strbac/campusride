@@ -2,7 +2,7 @@
 
 > A full-stack student carpooling platform connecting university students traveling between cities through ride offers, bookings, real-time communication, and trusted community features.
 
-![Java](https://img.shields.io/badge/Java-17-orange)
+![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-brightgreen)
 ![React](https://img.shields.io/badge/React-TypeScript-61DAFB)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
@@ -98,7 +98,7 @@ Asynchronous communication between modules is handled through **RabbitMQ** domai
 
 ### Backend
 
-- Java 17
+- Java 21
 - Spring Boot
 - Spring Security
 - Spring Data JPA

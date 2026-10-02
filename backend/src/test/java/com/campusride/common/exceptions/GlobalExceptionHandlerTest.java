@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -219,5 +220,21 @@ class GlobalExceptionHandlerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().message()).isEqualTo("Invalid limit");
+  }
+
+  @Test
+  void handleAuthentication_shouldReturn401WithoutExposingInternalDetails() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/api/auth/login");
+
+    var response =
+        handler.handleAuthentication(
+            new BadCredentialsException("Internal authentication details"), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().message()).isEqualTo("Authentication failed");
+    assertThat(response.getBody().path()).isEqualTo("/api/auth/login");
   }
 }

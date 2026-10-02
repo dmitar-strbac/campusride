@@ -108,8 +108,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
               throw new AccessDeniedException("Authentication required");
             }
 
+            if (command == StompCommand.UNSUBSCRIBE) {
+              return message;
+            }
+
             if (command == StompCommand.SUBSCRIBE
                 && "/user/queue/chats/unread".equals(accessor.getDestination())) {
+              return message;
+            }
+
+            if (command == StompCommand.SUBSCRIBE
+                && "/user/queue/notifications".equals(accessor.getDestination())) {
               return message;
             }
 
