@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ridesApi } from '../api/ridesApi';
 import { useAuth } from '../context/useAuth';
@@ -22,35 +22,54 @@ export function RidesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    async function fetchRides(from: string, to: string) {
+  const requestGeneration = useRef(0);
+
+  const loadRides = useCallback(
+    async (from: string, to: string, departureDate: string, minimumSeats: number) => {
+      const requestId = ++requestGeneration.current;
+
       setError('');
       setIsLoading(true);
-      try {
-        const data = await ridesApi.searchRides(from, to, token ?? undefined);
-        setRides(data);
-      } catch {
-        setError('Could not load rides. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    }
 
-    void fetchRides('', '');
-  }, [token]);
+      try {
+        const data = await ridesApi.searchRides(
+          from,
+          to,
+          token ?? undefined,
+          departureDate || undefined,
+          minimumSeats,
+        );
+
+        if (requestGeneration.current === requestId) {
+          setRides(data);
+        }
+      } catch {
+        if (requestGeneration.current === requestId) {
+          setError('Could not load rides. Please try again.');
+        }
+      } finally {
+        if (requestGeneration.current === requestId) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadRides('', '', '', 1);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      requestGeneration.current += 1;
+    };
+  }, [loadRides]);
 
   async function handleSearch(event: React.FormEvent) {
     event.preventDefault();
-    setError('');
-    setIsLoading(true);
-    try {
-      const data = await ridesApi.searchRides(origin, destination, token ?? undefined);
-      setRides(data);
-    } catch {
-      setError('Could not load rides. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    await loadRides(origin, destination, date, seats);
   }
 
   return (
@@ -63,7 +82,7 @@ export function RidesPage() {
             </p>
             <h1 className="mt-3 text-4xl font-bold text-white">Available student rides</h1>
             <p className="mt-3 max-w-2xl text-slate-400">
-              Search upcoming intercity rides shared by verified CampusRide students.
+              Search upcoming intercity rides shared by CampusRide students.
             </p>
           </div>
           <Link

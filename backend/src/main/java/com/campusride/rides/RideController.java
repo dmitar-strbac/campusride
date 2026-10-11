@@ -6,8 +6,10 @@ import com.campusride.users.User;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -33,12 +35,15 @@ public class RideController {
     return rideService.createRide(request, user);
   }
 
-  @Operation(summary = "Search availablerides")
+  @Operation(summary = "Search available rides")
   @GetMapping
   public List<RideResponse> searchRides(
       @RequestParam(required = false) String origin,
-      @RequestParam(required = false) String destination) {
-    return rideService.searchRides(origin, destination);
+      @RequestParam(required = false) String destination,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+      @RequestParam(defaultValue = "1") int seats) {
+
+    return rideService.searchRides(origin, destination, date, seats);
   }
 
   @Operation(summary = "Get ride details")

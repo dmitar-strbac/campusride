@@ -16,15 +16,33 @@ public interface RideRepository extends JpaRepository<Ride, Long> {
 
   @Query(
       """
-            select r from Ride r
-            where r.status = :status
-              and r.departureTime > :now
-              and (:origin is null or lower(r.origin) like concat('%', lower(cast(:origin as string)), '%'))
-              and (:destination is null or lower(r.destination) like concat('%', lower(cast(:destination as string)), '%'))
-            order by r.departureTime asc
-            """)
+    select r from Ride r
+    where r.status = :status
+      and r.departureTime > :now
+      and r.availableSeats >= :seats
+      and (
+        :filterDate = false
+        or (r.departureTime >= :dayStart and r.departureTime < :dayEnd)
+      )
+      and (
+        :origin is null
+        or lower(r.origin) like concat('%', lower(cast(:origin as string)), '%')
+      )
+      and (
+        :destination is null
+        or lower(r.destination) like concat('%', lower(cast(:destination as string)), '%')
+      )
+    order by r.departureTime asc
+    """)
   List<Ride> searchActiveRides(
-      RideStatus status, LocalDateTime now, String origin, String destination);
+      RideStatus status,
+      LocalDateTime now,
+      String origin,
+      String destination,
+      int seats,
+      boolean filterDate,
+      LocalDateTime dayStart,
+      LocalDateTime dayEnd);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select r from Ride r where r.id = :id")

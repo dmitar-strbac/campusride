@@ -15,12 +15,20 @@ export const ridesApi = {
     return response.data;
   },
 
-  async searchRides(origin?: string, destination?: string, token?: string): Promise<Ride[]> {
+  async searchRides(
+    origin?: string,
+    destination?: string,
+    token?: string,
+    date?: string,
+    seats = 1,
+  ): Promise<Ride[]> {
     const response = await apiClient.get<Ride[]>('/rides', {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       params: {
         origin: origin || undefined,
         destination: destination || undefined,
+        date: date || undefined,
+        seats,
       },
     });
 
