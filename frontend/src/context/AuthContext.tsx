@@ -1,71 +1,156 @@
-import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { authApi } from '../api/authApi';
-import type { LoginRequest, RegisterRequest, User } from '../types/auth';
+import type { AuthResponse, LoginRequest, RegisterRequest, User } from '../types/auth';
 import { AuthContext } from './authContextValue';
 
 const TOKEN_KEY = 'campusride_token';
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(Boolean(token));
+type Session = {
+  token: string | null;
+  user: User | null;
+  isLoading: boolean;
+  error: string | null;
+};
 
-  useEffect(() => {
-    async function loadUser() {
-      if (!token) {
-        setIsLoading(false);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session>(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
+
+    return {
+      token,
+      user: null,
+      isLoading: Boolean(token),
+      error: null,
+    };
+  });
+
+  const tokenRef = useRef(session.token);
+  const generation = useRef(0);
+  const mounted = useRef(true);
+
+  const logout = useCallback(() => {
+    generation.current += 1;
+    tokenRef.current = null;
+    localStorage.removeItem(TOKEN_KEY);
+
+    setSession({
+      token: null,
+      user: null,
+      isLoading: false,
+      error: null,
+    });
+  }, []);
+
+  const retrySession = useCallback(async () => {
+    const token = tokenRef.current;
+    if (!token) return;
+
+    const requestId = ++generation.current;
+
+    setSession((current) => ({
+      ...current,
+      isLoading: true,
+      error: null,
+    }));
+
+    try {
+      const user = await authApi.getCurrentUser(token);
+
+      if (!mounted.current || generation.current !== requestId) return;
+
+      setSession({
+        token,
+        user,
+        isLoading: false,
+        error: null,
+      });
+    } catch (error: unknown) {
+      if (!mounted.current || generation.current !== requestId) return;
+
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        logout();
         return;
       }
 
-      try {
-        const currentUser = await authApi.getCurrentUser(token);
-        setUser(currentUser);
-      } catch {
-        localStorage.removeItem(TOKEN_KEY);
-        setToken(null);
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
+      setSession((current) => ({
+        ...current,
+        isLoading: false,
+        error: 'Your session could not be loaded. Please try again.',
+      }));
     }
+  }, [logout]);
 
-    loadUser();
-  }, [token]);
+  useEffect(() => {
+    mounted.current = true;
 
-  async function login(data: LoginRequest) {
-    const response = await authApi.login(data);
-    localStorage.setItem(TOKEN_KEY, response.token);
-    setToken(response.token);
+    const timer = window.setTimeout(() => {
+      void retrySession();
+    }, 0);
 
-    const currentUser = await authApi.getCurrentUser(response.token);
-    setUser(currentUser);
-  }
+    return () => {
+      mounted.current = false;
+      generation.current += 1;
+      window.clearTimeout(timer);
+    };
+  }, [retrySession]);
 
-  async function register(data: RegisterRequest) {
-    const response = await authApi.register(data);
-    localStorage.setItem(TOKEN_KEY, response.token);
-    setToken(response.token);
+  const authenticate = useCallback(async (request: () => Promise<AuthResponse>) => {
+    const requestId = ++generation.current;
 
-    const currentUser = await authApi.getCurrentUser(response.token);
-    setUser(currentUser);
-  }
+    try {
+      const response = await request();
 
-  function logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    setToken(null);
-    setUser(null);
-  }
+      if (!mounted.current || generation.current !== requestId) {
+        throw new Error('Authentication was cancelled.');
+      }
+
+      const user = await authApi.getCurrentUser(response.token);
+
+      if (!mounted.current || generation.current !== requestId) {
+        throw new Error('Authentication was cancelled.');
+      }
+
+      localStorage.setItem(TOKEN_KEY, response.token);
+      tokenRef.current = response.token;
+
+      setSession({
+        token: response.token,
+        user,
+        isLoading: false,
+        error: null,
+      });
+    } catch (error: unknown) {
+      if (mounted.current && generation.current === requestId) {
+        setSession((current) => ({
+          ...current,
+          isLoading: false,
+        }));
+      }
+
+      throw error;
+    }
+  }, []);
+
+  const login = useCallback(
+    (data: LoginRequest) => authenticate(() => authApi.login(data)),
+    [authenticate],
+  );
+
+  const register = useCallback(
+    (data: RegisterRequest) => authenticate(() => authApi.register(data)),
+    [authenticate],
+  );
 
   const value = useMemo(
     () => ({
-      user,
-      token,
-      isLoading,
+      ...session,
       login,
       register,
       logout,
+      retrySession,
     }),
-    [user, token, isLoading],
+    [session, login, register, logout, retrySession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

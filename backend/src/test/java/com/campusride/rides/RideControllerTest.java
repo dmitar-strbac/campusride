@@ -50,12 +50,13 @@ class RideControllerTest {
   void searchRides_shouldReturnRides() {
     RideResponse expectedResponse = createRideResponse();
 
-    when(rideService.searchRides("Novi Sad", "Belgrade")).thenReturn(List.of(expectedResponse));
+    when(rideService.searchRides("Novi Sad", "Belgrade", null, 1))
+        .thenReturn(List.of(expectedResponse));
 
-    List<RideResponse> response = rideController.searchRides("Novi Sad", "Belgrade");
+    List<RideResponse> response = rideController.searchRides("Novi Sad", "Belgrade", null, 1);
 
     assertThat(response).containsExactly(expectedResponse);
-    verify(rideService).searchRides("Novi Sad", "Belgrade");
+    verify(rideService).searchRides("Novi Sad", "Belgrade", null, 1);
   }
 
   @Test

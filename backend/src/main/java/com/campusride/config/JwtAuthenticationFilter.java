@@ -1,7 +1,9 @@
 package com.campusride.config;
 
 import com.campusride.auth.JwtService;
+import com.campusride.users.User;
 import com.campusride.users.UserRepository;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,30 +28,50 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
-    String authHeader = request.getHeader("Authorization");
+    String header = request.getHeader("Authorization");
 
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+    if (header == null) {
       filterChain.doFilter(request, response);
       return;
     }
 
-    String token = authHeader.substring(7);
-    String email = jwtService.extractUsername(token);
+    if (!header.startsWith("Bearer ") || header.substring(7).isBlank()) {
+      reject(response);
+      return;
+    }
 
-    if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-      userRepository
-          .findByEmail(email)
-          .filter(user -> jwtService.isTokenValid(token, user.getEmail()))
-          .ifPresent(
-              user -> {
-                UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+    try {
+      String token = header.substring(7);
+      String email = jwtService.extractUsername(token);
 
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-              });
+      if (email == null || email.isBlank()) {
+        reject(response);
+        return;
+      }
+
+      User user = userRepository.findByEmail(email).orElse(null);
+
+      if (user == null || !jwtService.isTokenValid(token, user.getEmail())) {
+        reject(response);
+        return;
+      }
+
+      if (SecurityContextHolder.getContext().getAuthentication() == null) {
+        var authentication =
+            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+      }
+    } catch (JwtException | IllegalArgumentException ex) {
+      reject(response);
+      return;
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  private void reject(HttpServletResponse response) throws IOException {
+    SecurityContextHolder.clearContext();
+    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid bearer token");
   }
 }

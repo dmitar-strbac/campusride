@@ -1,6 +1,7 @@
 package com.campusride.config;
 
 import com.campusride.users.UserRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,11 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .authenticated())
+        .exceptionHandling(
+            exceptions ->
+                exceptions.authenticationEntryPoint(
+                    (request, response, exception) ->
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authenticationProvider(authenticationProvider())
@@ -97,5 +103,15 @@ public class SecurityConfig {
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public org.springframework.boot.web.servlet.FilterRegistrationBean<JwtAuthenticationFilter>
+      jwtFilterRegistration() {
+
+    var registration =
+        new org.springframework.boot.web.servlet.FilterRegistrationBean<>(jwtAuthenticationFilter);
+    registration.setEnabled(false);
+    return registration;
   }
 }

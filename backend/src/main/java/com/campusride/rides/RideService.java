@@ -1,22 +1,31 @@
 package com.campusride.rides;
 
+import com.campusride.bookings.BookingRepository;
+import com.campusride.bookings.BookingStatus;
 import com.campusride.common.exceptions.RideAccessDeniedException;
 import com.campusride.common.exceptions.RideAlreadyCancelledException;
 import com.campusride.common.exceptions.RideNotFoundException;
+import com.campusride.notifications.NotificationType;
+import com.campusride.notifications.event.NotificationEventPublisher;
 import com.campusride.rides.dto.CreateRideRequest;
 import com.campusride.rides.dto.RideResponse;
 import com.campusride.users.User;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class RideService {
 
   private final RideRepository rideRepository;
+  private final BookingRepository bookingRepository;
+  private final NotificationEventPublisher notificationEvents;
 
+  @Transactional
   public RideResponse createRide(CreateRideRequest request, User driver) {
     Ride ride =
         Ride.builder()
@@ -32,13 +41,32 @@ public class RideService {
     return RideResponse.from(rideRepository.save(ride));
   }
 
-  public List<RideResponse> searchRides(String origin, String destination) {
+  @Transactional(readOnly = true)
+  public List<RideResponse> searchRides(
+      String origin, String destination, LocalDate date, int seats) {
+
+    if (seats < 1 || seats > 8) {
+      throw new IllegalArgumentException("seats must be between 1 and 8");
+    }
+
+    if ((origin != null && origin.length() > 255)
+        || (destination != null && destination.length() > 255)) {
+      throw new IllegalArgumentException("City names must not exceed 255 characters");
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    LocalDate day = date == null ? now.toLocalDate() : date;
+
     return rideRepository
         .searchActiveRides(
             RideStatus.ACTIVE,
-            LocalDateTime.now(),
+            now,
             normalizeSearchParam(origin),
-            normalizeSearchParam(destination))
+            normalizeSearchParam(destination),
+            seats,
+            date != null,
+            day.atStartOfDay(),
+            day.plusDays(1).atStartOfDay())
         .stream()
         .map(RideResponse::from)
         .toList();
@@ -48,18 +76,21 @@ public class RideService {
     return value == null || value.isBlank() ? null : value.trim();
   }
 
+  @Transactional(readOnly = true)
   public RideResponse getRide(Long id) {
     return RideResponse.from(rideRepository.findById(id).orElseThrow(RideNotFoundException::new));
   }
 
+  @Transactional(readOnly = true)
   public List<RideResponse> getMyOfferedRides(User driver) {
     return rideRepository.findByDriverOrderByDepartureTimeDesc(driver).stream()
         .map(RideResponse::from)
         .toList();
   }
 
+  @Transactional
   public RideResponse cancelRide(Long id, User driver) {
-    Ride ride = rideRepository.findById(id).orElseThrow(RideNotFoundException::new);
+    Ride ride = rideRepository.findByIdForUpdate(id).orElseThrow(RideNotFoundException::new);
 
     if (!ride.getDriver().getId().equals(driver.getId())) {
       throw new RideAccessDeniedException();
@@ -71,6 +102,14 @@ public class RideService {
 
     ride.setStatus(RideStatus.CANCELLED);
 
-    return RideResponse.from(rideRepository.save(ride));
+    RideResponse response = RideResponse.from(rideRepository.save(ride));
+
+    for (Long passengerId :
+        bookingRepository.findPassengerIdsByRideIdAndStatus(ride.getId(), BookingStatus.ACCEPTED)) {
+      notificationEvents.publish(
+          passengerId, NotificationType.RIDE_CANCELLED, ride, null, driver, null);
+    }
+
+    return response;
   }
 }

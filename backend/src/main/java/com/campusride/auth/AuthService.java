@@ -8,6 +8,8 @@ import com.campusride.users.Role;
 import com.campusride.users.User;
 import com.campusride.users.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,7 +38,14 @@ public class AuthService {
             .role(Role.STUDENT)
             .build();
 
-    userRepository.save(user);
+    try {
+      userRepository.save(user);
+    } catch (DataIntegrityViolationException ex) {
+      if (isEmailConflict(ex)) {
+        throw new EmailAlreadyExistsException(request.email());
+      }
+      throw ex;
+    }
 
     return new AuthResponse(jwtService.generateToken(user.getEmail()));
   }
@@ -46,5 +55,16 @@ public class AuthService {
         new UsernamePasswordAuthenticationToken(request.email(), request.password()));
 
     return new AuthResponse(jwtService.generateToken(request.email()));
+  }
+
+  private boolean isEmailConflict(Throwable error) {
+    for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+      if (cause instanceof ConstraintViolationException violation
+          && "23505".equals(violation.getSQLState())
+          && "users_email_key".equals(violation.getConstraintName())) {
+        return true;
+      }
+    }
+    return false;
   }
 }

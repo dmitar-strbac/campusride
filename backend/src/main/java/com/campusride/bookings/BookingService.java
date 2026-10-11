@@ -10,6 +10,8 @@ import com.campusride.common.exceptions.InvalidBookingStateException;
 import com.campusride.common.exceptions.OwnRideBookingException;
 import com.campusride.common.exceptions.RideAccessDeniedException;
 import com.campusride.common.exceptions.RideNotFoundException;
+import com.campusride.notifications.NotificationType;
+import com.campusride.notifications.event.NotificationEventPublisher;
 import com.campusride.rides.Ride;
 import com.campusride.rides.RideRepository;
 import com.campusride.rides.RideStatus;
@@ -29,10 +31,12 @@ public class BookingService {
 
   private final BookingRepository bookingRepository;
   private final RideRepository rideRepository;
+  private final NotificationEventPublisher notificationEvents;
 
   @Transactional
   public BookingResponse requestBooking(Long rideId, CreateBookingRequest request, User passenger) {
-    Ride ride = rideRepository.findById(rideId).orElseThrow(RideNotFoundException::new);
+
+    Ride ride = rideRepository.findByIdForUpdate(rideId).orElseThrow(RideNotFoundException::new);
 
     validateRideCanBeBooked(ride);
 
@@ -49,15 +53,24 @@ public class BookingService {
       throw new DuplicateBookingException();
     }
 
-    Booking booking =
-        Booking.builder()
-            .ride(ride)
-            .passenger(passenger)
-            .requestedSeats(request.requestedSeats())
-            .status(BookingStatus.PENDING)
-            .build();
+    Booking saved =
+        bookingRepository.save(
+            Booking.builder()
+                .ride(ride)
+                .passenger(passenger)
+                .requestedSeats(request.requestedSeats())
+                .status(BookingStatus.PENDING)
+                .build());
 
-    return BookingResponse.from(bookingRepository.save(booking));
+    notificationEvents.publish(
+        ride.getDriver().getId(),
+        NotificationType.BOOKING_REQUESTED,
+        ride,
+        saved.getId(),
+        passenger,
+        saved.getRequestedSeats());
+
+    return BookingResponse.from(saved);
   }
 
   @Transactional(readOnly = true)
@@ -80,17 +93,11 @@ public class BookingService {
 
   @Transactional
   public BookingResponse acceptBooking(Long bookingId, User driver) {
-    Booking booking =
-        bookingRepository.findByIdForUpdate(bookingId).orElseThrow(BookingNotFoundException::new);
+    Booking booking = lockBookingAndRide(bookingId);
+    Ride ride = booking.getRide();
 
-    ensureDriverOwnsRide(booking.getRide(), driver);
+    ensureDriverOwnsRide(ride, driver);
     ensureStatus(booking, BookingStatus.PENDING, "Only pending bookings can be accepted");
-
-    Ride ride =
-        rideRepository
-            .findByIdForUpdate(booking.getRide().getId())
-            .orElseThrow(RideNotFoundException::new);
-
     validateRideCanBeBooked(ride);
 
     if (booking.getRequestedSeats() > ride.getAvailableSeats()) {
@@ -98,37 +105,59 @@ public class BookingService {
     }
 
     ride.setAvailableSeats(ride.getAvailableSeats() - booking.getRequestedSeats());
-    booking.setRide(ride);
     booking.setStatus(BookingStatus.ACCEPTED);
 
     rideRepository.save(ride);
-    return BookingResponse.from(bookingRepository.save(booking));
+    Booking saved = bookingRepository.save(booking);
+
+    notificationEvents.publish(
+        saved.getPassenger().getId(),
+        NotificationType.BOOKING_ACCEPTED,
+        ride,
+        saved.getId(),
+        driver,
+        saved.getRequestedSeats());
+
+    return BookingResponse.from(saved);
   }
 
   @Transactional
   public BookingResponse rejectBooking(Long bookingId, User driver) {
-    Booking booking =
-        bookingRepository.findByIdForUpdate(bookingId).orElseThrow(BookingNotFoundException::new);
+    Booking booking = lockBookingAndRide(bookingId);
 
     ensureDriverOwnsRide(booking.getRide(), driver);
     ensureStatus(booking, BookingStatus.PENDING, "Only pending bookings can be rejected");
+    validateRideCanBeBooked(booking.getRide());
 
     booking.setStatus(BookingStatus.REJECTED);
+    Booking saved = bookingRepository.save(booking);
 
-    return BookingResponse.from(bookingRepository.save(booking));
+    notificationEvents.publish(
+        saved.getPassenger().getId(),
+        NotificationType.BOOKING_REJECTED,
+        saved.getRide(),
+        saved.getId(),
+        driver,
+        saved.getRequestedSeats());
+
+    return BookingResponse.from(saved);
   }
 
   @Transactional
   public BookingResponse cancelBooking(Long bookingId, User passenger) {
-    Booking booking =
-        bookingRepository.findByIdForUpdate(bookingId).orElseThrow(BookingNotFoundException::new);
+    Booking booking = lockBookingAndRide(bookingId);
+    Ride ride = booking.getRide();
 
     if (!booking.getPassenger().getId().equals(passenger.getId())) {
       throw new BookingAccessDeniedException();
     }
 
-    if (!booking.getRide().getDepartureTime().isAfter(LocalDateTime.now())) {
+    if (!ride.getDepartureTime().isAfter(LocalDateTime.now())) {
       throw new InvalidBookingStateException("Bookings cannot be cancelled after departure");
+    }
+
+    if (ride.getStatus() != RideStatus.ACTIVE) {
+      throw new InvalidBookingStateException("Bookings on cancelled rides cannot be cancelled");
     }
 
     if (booking.getStatus() != BookingStatus.PENDING
@@ -137,19 +166,37 @@ public class BookingService {
     }
 
     if (booking.getStatus() == BookingStatus.ACCEPTED) {
-      Ride ride =
-          rideRepository
-              .findByIdForUpdate(booking.getRide().getId())
-              .orElseThrow(RideNotFoundException::new);
-
       ride.setAvailableSeats(ride.getAvailableSeats() + booking.getRequestedSeats());
-      booking.setRide(ride);
       rideRepository.save(ride);
     }
 
     booking.setStatus(BookingStatus.CANCELLED);
+    Booking saved = bookingRepository.save(booking);
 
-    return BookingResponse.from(bookingRepository.save(booking));
+    notificationEvents.publish(
+        ride.getDriver().getId(),
+        NotificationType.BOOKING_CANCELLED,
+        ride,
+        saved.getId(),
+        passenger,
+        saved.getRequestedSeats());
+
+    return BookingResponse.from(saved);
+  }
+
+  private Booking lockBookingAndRide(Long bookingId) {
+    Long rideId =
+        bookingRepository
+            .findRideIdByBookingId(bookingId)
+            .orElseThrow(BookingNotFoundException::new);
+
+    Ride ride = rideRepository.findByIdForUpdate(rideId).orElseThrow(RideNotFoundException::new);
+
+    Booking booking =
+        bookingRepository.findByIdForUpdate(bookingId).orElseThrow(BookingNotFoundException::new);
+
+    booking.setRide(ride);
+    return booking;
   }
 
   private void validateRideCanBeBooked(Ride ride) {

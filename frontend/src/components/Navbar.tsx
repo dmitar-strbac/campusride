@@ -1,9 +1,10 @@
 import { CarFront, ClipboardCheck, MessageCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import logo from '../assets/images/logo.png';
 import { useAuth } from '../context/useAuth';
 import { useChatUnread } from '../context/useChatUnread';
+import { NotificationBell } from './notifications/NotificationBell';
 
 function getInitials(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -33,54 +34,75 @@ export function Navbar() {
   }
 
   return (
-    <header className="border-b border-white/10 bg-[#0d1b2e]">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center gap-3 text-xl font-bold text-white">
-          <img src={logo} alt="CampusRide logo" className="h-9 w-9 object-contain" />
-          <span>
+    <header className="relative z-40 border-b border-white/[0.08] bg-[#0d1b2e]/95">
+      <nav
+        aria-label="Main navigation"
+        className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 sm:px-6"
+      >
+        <Link
+          to="/"
+          aria-label="CampusRide home"
+          className="flex shrink-0 items-center gap-2 text-xl font-bold text-white sm:gap-3"
+        >
+          <img
+            src={logo}
+            alt=""
+            width={36}
+            height={36}
+            className="h-9 w-9 shrink-0 object-contain"
+          />
+
+          <span className="hidden sm:inline">
             Campus<span className="text-blue-400">Ride</span>
           </span>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="home-enter home-delay-1 flex shrink-0 items-center gap-1.5 sm:gap-2">
           {user ? (
             <>
-              <Link
+              <NavLink
                 to="/rides/my"
                 aria-label="My rides"
                 title="My rides"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-300"
+                className="app-nav-link"
               >
                 <CarFront size={20} strokeWidth={1.8} aria-hidden="true" />
-              </Link>
+              </NavLink>
 
-              <Link
+              <NavLink
                 to="/bookings/my"
                 aria-label="My bookings"
                 title="My bookings"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-300"
+                className="app-nav-link"
               >
                 <ClipboardCheck size={20} strokeWidth={1.8} aria-hidden="true" />
-              </Link>
+              </NavLink>
 
-              <Link
+              <NavLink
                 to="/chats"
-                aria-label="Messages"
+                aria-label={total > 0 ? `Messages, ${total} unread` : 'Messages'}
                 title="Messages"
-                className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-300"
+                className="app-nav-link"
               >
-                <MessageCircle size={20} strokeWidth={1.8} />
+                <MessageCircle size={20} strokeWidth={1.8} aria-hidden="true" />
+
                 {total > 0 && (
                   <span
-                    className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0d1b2e] bg-blue-500 px-1 text-[10px] font-bold leading-none text-white"
-                    aria-label={`${total} unread messages`}
+                    aria-hidden="true"
+                    className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0d1b2e] bg-blue-500 px-1 text-[10px] font-bold leading-none text-white"
                   >
                     {total > 99 ? '99+' : total}
                   </span>
                 )}
-              </Link>
+              </NavLink>
 
-              <div className="relative ml-1" ref={dropdownRef}>
+              <NotificationBell />
+
+              <div
+                className="flex items-center gap-1 rounded-xl p-1 transition"
+                aria-expanded={dropdownOpen}
+                ref={dropdownRef}
+              >
                 <button
                   onClick={() => setDropdownOpen((prev) => !prev)}
                   className="flex items-center gap-2 rounded-xl pl-1 pr-3 py-1 transition hover:bg-white/10"
@@ -90,7 +112,7 @@ export function Navbar() {
                     {getInitials(user.firstName, user.lastName)}
                   </div>
                   <svg
-                    className="h-4 w-4 text-slate-400"
+                    className="hidden h-4 w-4 text-slate-400 sm:block"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -103,7 +125,7 @@ export function Navbar() {
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute right-0 top-12 z-50 w-52 rounded-2xl border border-white/10 bg-[#0d1b2e] py-1 shadow-xl">
+                  <div className="notification-enter absolute right-0 top-12 z-50 w-52 rounded-2xl border border-white/10 bg-[#0d1b2e] py-1 shadow-xl">
                     <div className="border-b border-white/10 px-4 py-3">
                       <p className="text-sm font-semibold text-white">
                         {user.firstName} {user.lastName}

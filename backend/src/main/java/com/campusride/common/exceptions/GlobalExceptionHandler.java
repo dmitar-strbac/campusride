@@ -29,6 +29,23 @@ public class GlobalExceptionHandler {
     return buildErrorResponse(HttpStatus.BAD_REQUEST, message, request.getRequestURI());
   }
 
+  @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+  public ResponseEntity<ErrorResponse> handleAuthentication(
+      org.springframework.security.core.AuthenticationException ex, HttpServletRequest request) {
+    return buildErrorResponse(
+        HttpStatus.UNAUTHORIZED, "Authentication failed", request.getRequestURI());
+  }
+
+  @ExceptionHandler({
+    org.springframework.http.converter.HttpMessageNotReadableException.class,
+    org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+    org.springframework.web.bind.MissingServletRequestParameterException.class
+  })
+  public ResponseEntity<ErrorResponse> handleMalformedRequest(
+      Exception ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.BAD_REQUEST, "Invalid request", request.getRequestURI());
+  }
+
   @ExceptionHandler(RideNotFoundException.class)
   public ResponseEntity<ErrorResponse> handleRideNotFound(
       RideNotFoundException ex, HttpServletRequest request) {
@@ -87,6 +104,12 @@ public class GlobalExceptionHandler {
       Exception ex, HttpServletRequest request) {
     return buildErrorResponse(
         HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error", request.getRequestURI());
+  }
+
+  @ExceptionHandler(NotificationNotFoundException.class)
+  public ResponseEntity<ErrorResponse> handleNotificationNotFound(
+      NotificationNotFoundException ex, HttpServletRequest request) {
+    return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request.getRequestURI());
   }
 
   private ResponseEntity<ErrorResponse> buildErrorResponse(

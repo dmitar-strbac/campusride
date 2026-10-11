@@ -7,11 +7,16 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.campusride.bookings.BookingRepository;
+import com.campusride.bookings.BookingStatus;
 import com.campusride.common.exceptions.RideAccessDeniedException;
 import com.campusride.common.exceptions.RideAlreadyCancelledException;
 import com.campusride.common.exceptions.RideNotFoundException;
+import com.campusride.notifications.NotificationType;
+import com.campusride.notifications.event.NotificationEventPublisher;
 import com.campusride.rides.dto.CreateRideRequest;
 import com.campusride.rides.dto.RideResponse;
 import com.campusride.users.Role;
@@ -20,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,6 +38,8 @@ class RideServiceTest {
   @Mock private RideRepository rideRepository;
 
   @InjectMocks private RideService rideService;
+  @Mock private BookingRepository bookingRepository;
+  @Mock private NotificationEventPublisher notificationEvents;
 
   @Test
   void createRide_shouldCreateRideAndReturnResponse() {
@@ -75,51 +83,123 @@ class RideServiceTest {
 
   @Test
   void searchRides_shouldReturnActiveFutureRides() {
-    User driver = createUser(1L);
-    Ride ride = createRide(1L, driver, RideStatus.ACTIVE);
+    Ride ride = createRide(1L, createUser(1L), RideStatus.ACTIVE);
 
     when(rideRepository.searchActiveRides(
-            eq(RideStatus.ACTIVE), any(), eq("Novi Sad"), eq("Belgrade")))
+            eq(RideStatus.ACTIVE),
+            any(),
+            eq("Novi Sad"),
+            eq("Belgrade"),
+            eq(1),
+            eq(false),
+            any(),
+            any()))
         .thenReturn(List.of(ride));
 
-    List<RideResponse> response = rideService.searchRides("Novi Sad", "Belgrade");
+    List<RideResponse> response = rideService.searchRides("Novi Sad", "Belgrade", null, 1);
 
     assertThat(response).hasSize(1);
-    assertThat(response.get(0).origin()).isEqualTo("Novi Sad");
-    assertThat(response.get(0).destination()).isEqualTo("Belgrade");
+    assertThat(response.getFirst().origin()).isEqualTo("Novi Sad");
   }
 
   @Test
   void searchRides_shouldNormalizeBlankParamsToNull() {
-    when(rideRepository.searchActiveRides(eq(RideStatus.ACTIVE), any(), isNull(), isNull()))
+    when(rideRepository.searchActiveRides(
+            eq(RideStatus.ACTIVE), any(), isNull(), isNull(), eq(1), eq(false), any(), any()))
         .thenReturn(List.of());
 
-    List<RideResponse> response = rideService.searchRides(" ", "");
+    assertThat(rideService.searchRides(" ", "", null, 1)).isEmpty();
 
-    assertThat(response).isEmpty();
-    verify(rideRepository).searchActiveRides(eq(RideStatus.ACTIVE), any(), isNull(), isNull());
+    verify(rideRepository)
+        .searchActiveRides(
+            eq(RideStatus.ACTIVE), any(), isNull(), isNull(), eq(1), eq(false), any(), any());
   }
 
   @Test
   void searchRides_shouldTrimParams() {
     when(rideRepository.searchActiveRides(
-            eq(RideStatus.ACTIVE), any(), eq("Novi Sad"), eq("Belgrade")))
+            eq(RideStatus.ACTIVE),
+            any(),
+            eq("Novi Sad"),
+            eq("Belgrade"),
+            eq(1),
+            eq(false),
+            any(),
+            any()))
         .thenReturn(List.of());
 
-    rideService.searchRides("  Novi Sad  ", "  Belgrade  ");
+    rideService.searchRides("  Novi Sad  ", "  Belgrade  ", null, 1);
 
     verify(rideRepository)
-        .searchActiveRides(eq(RideStatus.ACTIVE), any(), eq("Novi Sad"), eq("Belgrade"));
+        .searchActiveRides(
+            eq(RideStatus.ACTIVE),
+            any(),
+            eq("Novi Sad"),
+            eq("Belgrade"),
+            eq(1),
+            eq(false),
+            any(),
+            any());
   }
 
   @Test
   void searchRides_shouldHandleNullSearchParams() {
-    when(rideRepository.searchActiveRides(eq(RideStatus.ACTIVE), any(), isNull(), isNull()))
+    when(rideRepository.searchActiveRides(
+            eq(RideStatus.ACTIVE), any(), isNull(), isNull(), eq(1), eq(false), any(), any()))
         .thenReturn(List.of());
 
-    rideService.searchRides(null, null);
+    assertThat(rideService.searchRides(null, null, null, 1)).isEmpty();
+  }
 
-    verify(rideRepository).searchActiveRides(eq(RideStatus.ACTIVE), any(), isNull(), isNull());
+  @Test
+  void searchRides_shouldApplyDateAndSeats() {
+    var date = java.time.LocalDate.now().plusDays(2);
+
+    when(rideRepository.searchActiveRides(
+            eq(RideStatus.ACTIVE),
+            any(),
+            isNull(),
+            isNull(),
+            eq(3),
+            eq(true),
+            eq(date.atStartOfDay()),
+            eq(date.plusDays(1).atStartOfDay())))
+        .thenReturn(List.of());
+
+    rideService.searchRides(null, null, date, 3);
+
+    verify(rideRepository)
+        .searchActiveRides(
+            eq(RideStatus.ACTIVE),
+            any(),
+            isNull(),
+            isNull(),
+            eq(3),
+            eq(true),
+            eq(date.atStartOfDay()),
+            eq(date.plusDays(1).atStartOfDay()));
+  }
+
+  @Test
+  void searchRides_shouldRejectInvalidSeats() {
+    assertThatThrownBy(() -> rideService.searchRides(null, null, null, 0))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThatThrownBy(() -> rideService.searchRides(null, null, null, 9))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    verifyNoInteractions(rideRepository);
+  }
+
+  @Test
+  void searchRides_shouldRejectTooLongCities() {
+    assertThatThrownBy(() -> rideService.searchRides("x".repeat(256), null, null, 1))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThatThrownBy(() -> rideService.searchRides(null, "x".repeat(256), null, 1))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    verifyNoInteractions(rideRepository);
   }
 
   @Test
@@ -160,25 +240,32 @@ class RideServiceTest {
     User driver = createUser(1L);
     Ride ride = createRide(1L, driver, RideStatus.ACTIVE);
 
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
     when(rideRepository.save(ride)).thenReturn(ride);
+    when(bookingRepository.findPassengerIdsByRideIdAndStatus(1L, BookingStatus.ACCEPTED))
+        .thenReturn(Set.of(2L, 3L));
 
     RideResponse response = rideService.cancelRide(1L, driver);
 
     assertThat(response.status()).isEqualTo(RideStatus.CANCELLED);
     verify(rideRepository).save(ride);
+    verify(notificationEvents)
+        .publish(2L, NotificationType.RIDE_CANCELLED, ride, null, driver, null);
+    verify(notificationEvents)
+        .publish(3L, NotificationType.RIDE_CANCELLED, ride, null, driver, null);
   }
 
   @Test
   void cancelRide_shouldThrowExceptionWhenRideDoesNotExist() {
     User driver = createUser(1L);
 
-    when(rideRepository.findById(99L)).thenReturn(Optional.empty());
+    when(rideRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> rideService.cancelRide(99L, driver))
         .isInstanceOf(RideNotFoundException.class);
 
     verify(rideRepository, never()).save(any());
+    verifyNoInteractions(bookingRepository, notificationEvents);
   }
 
   @Test
@@ -187,12 +274,13 @@ class RideServiceTest {
     User otherUser = createUser(2L);
     Ride ride = createRide(1L, driver, RideStatus.ACTIVE);
 
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
 
     assertThatThrownBy(() -> rideService.cancelRide(1L, otherUser))
         .isInstanceOf(RideAccessDeniedException.class);
 
     verify(rideRepository, never()).save(any());
+    verifyNoInteractions(bookingRepository, notificationEvents);
   }
 
   @Test
@@ -200,12 +288,13 @@ class RideServiceTest {
     User driver = createUser(1L);
     Ride ride = createRide(1L, driver, RideStatus.CANCELLED);
 
-    when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+    when(rideRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(ride));
 
     assertThatThrownBy(() -> rideService.cancelRide(1L, driver))
         .isInstanceOf(RideAlreadyCancelledException.class);
 
     verify(rideRepository, never()).save(any());
+    verifyNoInteractions(bookingRepository, notificationEvents);
   }
 
   private User createUser(Long id) {
