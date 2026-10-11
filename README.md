@@ -224,7 +224,7 @@ cd backend
 - [x] Ride management
 - [x] Booking workflow
 - [x] Chat
-- [ ] Notifications
+- [x] Notifications
 - [ ] Ratings
 - [ ] Maps
 - [ ] CI/CD

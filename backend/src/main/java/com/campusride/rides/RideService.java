@@ -10,6 +10,7 @@ import com.campusride.notifications.event.NotificationEventPublisher;
 import com.campusride.rides.dto.CreateRideRequest;
 import com.campusride.rides.dto.RideResponse;
 import com.campusride.users.User;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -41,13 +42,31 @@ public class RideService {
   }
 
   @Transactional(readOnly = true)
-  public List<RideResponse> searchRides(String origin, String destination) {
+  public List<RideResponse> searchRides(
+      String origin, String destination, LocalDate date, int seats) {
+
+    if (seats < 1 || seats > 8) {
+      throw new IllegalArgumentException("seats must be between 1 and 8");
+    }
+
+    if ((origin != null && origin.length() > 255)
+        || (destination != null && destination.length() > 255)) {
+      throw new IllegalArgumentException("City names must not exceed 255 characters");
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    LocalDate day = date == null ? now.toLocalDate() : date;
+
     return rideRepository
         .searchActiveRides(
             RideStatus.ACTIVE,
-            LocalDateTime.now(),
+            now,
             normalizeSearchParam(origin),
-            normalizeSearchParam(destination))
+            normalizeSearchParam(destination),
+            seats,
+            date != null,
+            day.atStartOfDay(),
+            day.plusDays(1).atStartOfDay())
         .stream()
         .map(RideResponse::from)
         .toList();

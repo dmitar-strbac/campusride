@@ -56,6 +56,13 @@ type TypingEvent = {
 };
 
 export function RideChatPage() {
+  const { rideId } = useParams();
+  const { token, user } = useAuth();
+
+  return <RideChatSession key={`${rideId}:${token}:${user?.id}`} />;
+}
+
+function RideChatSession() {
   const { rideId: rideIdParam } = useParams();
   const rideId = Number(rideIdParam);
   const invalidRideId = !Number.isSafeInteger(rideId) || rideId < 1;
@@ -85,10 +92,28 @@ export function RideChatPage() {
 
   const lastTypingSentRef = useRef(0);
 
+  const latestMessageIdRef = useRef(0);
+  const sessionGenerationRef = useRef(0);
+
   useEffect(() => {
     if (!token || invalidRideId) return;
 
     let active = true;
+    const typingTimers = typingTimersRef.current;
+
+    sessionGenerationRef.current += 1;
+
+    const markLatestVisible = () => {
+      if (!active || document.visibilityState !== 'visible') return;
+
+      const latestId = latestMessageIdRef.current;
+
+      if (latestId > 0) {
+        void markRead(rideId, latestId).catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', markLatestVisible);
     const client = new Client({
       webSocketFactory: () => new WebSocket(WS_BASE_URL),
       connectHeaders: {
@@ -116,9 +141,9 @@ export function RideChatPage() {
 
             setMessages((current) => chronological([...current, incoming]));
 
-            if (document.visibilityState === 'visible') {
-              void markRead(rideId, incoming.id).catch(() => {});
-            }
+            latestMessageIdRef.current = Math.max(latestMessageIdRef.current, incoming.id);
+
+            markLatestVisible();
           } catch {
             setSendError('A message could not be displayed. Reload the chat.');
           }
@@ -170,7 +195,15 @@ export function RideChatPage() {
           .getMessages(rideId, token)
           .then((recent) => {
             if (!active) return;
+
             setMessages((current) => chronological([...current, ...recent]));
+
+            latestMessageIdRef.current = Math.max(
+              latestMessageIdRef.current,
+              ...recent.map((message) => message.id),
+            );
+
+            markLatestVisible();
           })
           .catch((requestError: unknown) => {
             if (!active) return;
@@ -217,9 +250,9 @@ export function RideChatPage() {
 
         setRide(rideData);
         setMessages(chronological(recent));
-        if (recent.length > 0) {
-          void markRead(rideId, recent[0].id).catch(() => {});
-        }
+        latestMessageIdRef.current = Math.max(0, ...recent.map((message) => message.id));
+
+        markLatestVisible();
         setHasMore(recent.length === PAGE_SIZE);
         shouldScrollToBottomRef.current = true;
         clientRef.current = client;
@@ -241,6 +274,32 @@ export function RideChatPage() {
 
     return () => {
       active = false;
+      sessionGenerationRef.current += 1;
+
+      document.removeEventListener('visibilitychange', markLatestVisible);
+
+      if (localTypingTimerRef.current) {
+        clearTimeout(localTypingTimerRef.current);
+      }
+
+      for (const timer of typingTimers.values()) {
+        clearTimeout(timer);
+      }
+
+      typingTimers.clear();
+
+      if (client.connected) {
+        try {
+          client.publish({
+            destination: `/app/rides/${rideId}/typing`,
+            body: JSON.stringify({ typing: false }),
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch {
+          // The connection may close while leaving the page.
+        }
+      }
+
       clientRef.current = null;
       void client.deactivate();
     };
@@ -258,7 +317,9 @@ export function RideChatPage() {
       return;
     }
 
+    const requestGeneration = sessionGenerationRef.current;
     const container = listRef.current;
+
     const previousHeight = container?.scrollHeight ?? 0;
     const previousTop = container?.scrollTop ?? 0;
 
@@ -268,15 +329,19 @@ export function RideChatPage() {
     try {
       const older = await chatApi.getMessages(rideId, token, messages[0].id);
 
+      if (requestGeneration !== sessionGenerationRef.current) return;
+
       setMessages((current) => chronological([...older, ...current]));
       setHasMore(older.length === PAGE_SIZE);
 
       requestAnimationFrame(() => {
-        if (container) {
+        if (container && requestGeneration === sessionGenerationRef.current) {
           container.scrollTop = container.scrollHeight - previousHeight + previousTop;
         }
       });
     } catch (requestError) {
+      if (requestGeneration !== sessionGenerationRef.current) return;
+
       if (axios.isAxiosError(requestError) && requestError.response?.status === 403) {
         setError('You no longer have access to this ride chat.');
         void clientRef.current?.deactivate();
@@ -284,7 +349,9 @@ export function RideChatPage() {
         setSendError('Older messages could not be loaded. Try again.');
       }
     } finally {
-      setLoadingOlder(false);
+      if (requestGeneration === sessionGenerationRef.current) {
+        setLoadingOlder(false);
+      }
     }
   }
 

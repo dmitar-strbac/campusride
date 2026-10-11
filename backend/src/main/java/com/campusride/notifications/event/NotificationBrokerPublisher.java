@@ -32,7 +32,6 @@ public class NotificationBrokerPublisher {
 
     Message message = new Message(payload.getBytes(StandardCharsets.UTF_8), properties);
 
-    // Svaki publish pokušaj ima poseban correlation ID.
     CorrelationData correlation = new CorrelationData(UUID.randomUUID().toString());
 
     rabbitTemplate.send(

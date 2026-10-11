@@ -83,51 +83,123 @@ class RideServiceTest {
 
   @Test
   void searchRides_shouldReturnActiveFutureRides() {
-    User driver = createUser(1L);
-    Ride ride = createRide(1L, driver, RideStatus.ACTIVE);
+    Ride ride = createRide(1L, createUser(1L), RideStatus.ACTIVE);
 
     when(rideRepository.searchActiveRides(
-            eq(RideStatus.ACTIVE), any(), eq("Novi Sad"), eq("Belgrade")))
+            eq(RideStatus.ACTIVE),
+            any(),
+            eq("Novi Sad"),
+            eq("Belgrade"),
+            eq(1),
+            eq(false),
+            any(),
+            any()))
         .thenReturn(List.of(ride));
 
-    List<RideResponse> response = rideService.searchRides("Novi Sad", "Belgrade");
+    List<RideResponse> response = rideService.searchRides("Novi Sad", "Belgrade", null, 1);
 
     assertThat(response).hasSize(1);
-    assertThat(response.get(0).origin()).isEqualTo("Novi Sad");
-    assertThat(response.get(0).destination()).isEqualTo("Belgrade");
+    assertThat(response.getFirst().origin()).isEqualTo("Novi Sad");
   }
 
   @Test
   void searchRides_shouldNormalizeBlankParamsToNull() {
-    when(rideRepository.searchActiveRides(eq(RideStatus.ACTIVE), any(), isNull(), isNull()))
+    when(rideRepository.searchActiveRides(
+            eq(RideStatus.ACTIVE), any(), isNull(), isNull(), eq(1), eq(false), any(), any()))
         .thenReturn(List.of());
 
-    List<RideResponse> response = rideService.searchRides(" ", "");
+    assertThat(rideService.searchRides(" ", "", null, 1)).isEmpty();
 
-    assertThat(response).isEmpty();
-    verify(rideRepository).searchActiveRides(eq(RideStatus.ACTIVE), any(), isNull(), isNull());
+    verify(rideRepository)
+        .searchActiveRides(
+            eq(RideStatus.ACTIVE), any(), isNull(), isNull(), eq(1), eq(false), any(), any());
   }
 
   @Test
   void searchRides_shouldTrimParams() {
     when(rideRepository.searchActiveRides(
-            eq(RideStatus.ACTIVE), any(), eq("Novi Sad"), eq("Belgrade")))
+            eq(RideStatus.ACTIVE),
+            any(),
+            eq("Novi Sad"),
+            eq("Belgrade"),
+            eq(1),
+            eq(false),
+            any(),
+            any()))
         .thenReturn(List.of());
 
-    rideService.searchRides("  Novi Sad  ", "  Belgrade  ");
+    rideService.searchRides("  Novi Sad  ", "  Belgrade  ", null, 1);
 
     verify(rideRepository)
-        .searchActiveRides(eq(RideStatus.ACTIVE), any(), eq("Novi Sad"), eq("Belgrade"));
+        .searchActiveRides(
+            eq(RideStatus.ACTIVE),
+            any(),
+            eq("Novi Sad"),
+            eq("Belgrade"),
+            eq(1),
+            eq(false),
+            any(),
+            any());
   }
 
   @Test
   void searchRides_shouldHandleNullSearchParams() {
-    when(rideRepository.searchActiveRides(eq(RideStatus.ACTIVE), any(), isNull(), isNull()))
+    when(rideRepository.searchActiveRides(
+            eq(RideStatus.ACTIVE), any(), isNull(), isNull(), eq(1), eq(false), any(), any()))
         .thenReturn(List.of());
 
-    rideService.searchRides(null, null);
+    assertThat(rideService.searchRides(null, null, null, 1)).isEmpty();
+  }
 
-    verify(rideRepository).searchActiveRides(eq(RideStatus.ACTIVE), any(), isNull(), isNull());
+  @Test
+  void searchRides_shouldApplyDateAndSeats() {
+    var date = java.time.LocalDate.now().plusDays(2);
+
+    when(rideRepository.searchActiveRides(
+            eq(RideStatus.ACTIVE),
+            any(),
+            isNull(),
+            isNull(),
+            eq(3),
+            eq(true),
+            eq(date.atStartOfDay()),
+            eq(date.plusDays(1).atStartOfDay())))
+        .thenReturn(List.of());
+
+    rideService.searchRides(null, null, date, 3);
+
+    verify(rideRepository)
+        .searchActiveRides(
+            eq(RideStatus.ACTIVE),
+            any(),
+            isNull(),
+            isNull(),
+            eq(3),
+            eq(true),
+            eq(date.atStartOfDay()),
+            eq(date.plusDays(1).atStartOfDay()));
+  }
+
+  @Test
+  void searchRides_shouldRejectInvalidSeats() {
+    assertThatThrownBy(() -> rideService.searchRides(null, null, null, 0))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThatThrownBy(() -> rideService.searchRides(null, null, null, 9))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    verifyNoInteractions(rideRepository);
+  }
+
+  @Test
+  void searchRides_shouldRejectTooLongCities() {
+    assertThatThrownBy(() -> rideService.searchRides("x".repeat(256), null, null, 1))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThatThrownBy(() -> rideService.searchRides(null, "x".repeat(256), null, 1))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    verifyNoInteractions(rideRepository);
   }
 
   @Test

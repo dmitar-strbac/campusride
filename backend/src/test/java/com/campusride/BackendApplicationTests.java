@@ -79,7 +79,6 @@ class BackendApplicationTests {
 
   @BeforeEach
   void prepareDatabase() {
-    // Ovo je baza iz test containera, ne razvojna baza.
     jdbc.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
 
     driver = users.save(user("driver@example.com"));
@@ -199,6 +198,55 @@ class BackendApplicationTests {
                 .filter(booking -> booking.getStatus() == BookingStatus.ACCEPTED)
                 .count())
         .isEqualTo(1);
+  }
+
+  @Test
+  void searchRides_shouldFilterByDateAndAvailableSeats() throws Exception {
+    var date = ride.getDepartureTime().toLocalDate();
+
+    Ride matching =
+        rides.save(
+            Ride.builder()
+                .driver(driver)
+                .origin("Novi Sad")
+                .destination("Belgrade")
+                .departureTime(date.atTime(10, 0))
+                .availableSeats(3)
+                .pricePerSeat(new BigDecimal("1000"))
+                .build());
+
+    rides.save(
+        Ride.builder()
+            .driver(driver)
+            .origin("Novi Sad")
+            .destination("Belgrade")
+            .departureTime(date.plusDays(1).atTime(10, 0))
+            .availableSeats(3)
+            .pricePerSeat(new BigDecimal("1000"))
+            .build());
+
+    mvc.perform(
+            get("/api/rides")
+                .param("origin", "Novi Sad")
+                .param("destination", "Belgrade")
+                .param("date", date.toString())
+                .param("seats", "2")
+                .header("Authorization", bearer(passenger)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(matching.getId().intValue()));
+  }
+
+  @Test
+  void searchRides_shouldRejectInvalidFilters() throws Exception {
+    mvc.perform(get("/api/rides").param("seats", "0").header("Authorization", bearer(passenger)))
+        .andExpect(status().isBadRequest());
+
+    mvc.perform(
+            get("/api/rides")
+                .param("date", "not-a-date")
+                .header("Authorization", bearer(passenger)))
+        .andExpect(status().isBadRequest());
   }
 
   private Callable<Boolean> acceptAfter(CountDownLatch start, Long bookingId) {
